@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-repo-inspector
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/airepo}
+    username: ${DB_USER:airepo}
+    password: ${DB_PASSWORD:airepo}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: INFO
+    com.airepo: DEBUG

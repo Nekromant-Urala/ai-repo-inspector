@@ -3,6 +3,7 @@ package com.airepo.ingestion
 import com.airepo.domain.RepositorySource
 import com.airepo.domain.SourceType
 import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -14,6 +15,7 @@ import java.util.zip.ZipInputStream
  *
  * Результат — локальная директория, по которой дальше прогоняются критерии.
  */
+@Component
 class ProjectLoader(
     /** Фабрика временной рабочей директории. В проде — из конфига, в тестах — в `build/`. */
     private val workDirProvider: () -> Path = { Files.createTempDirectory("airepo-") },

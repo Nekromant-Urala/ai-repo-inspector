@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":modules:analyzer-git"))
     implementation(project(":modules:analyzer-security"))
 
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("org.postgresql:postgresql")

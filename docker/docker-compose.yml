@@ -1,0 +1,46 @@
+# docker compose -f docker/docker-compose.yml up --build
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: airepo-db
+    environment:
+      POSTGRES_DB: airepo
+      POSTGRES_USER: airepo
+      POSTGRES_PASSWORD: airepo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airepo -d airepo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    container_name: airepo-backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/airepo
+      DB_USER: airepo
+      DB_PASSWORD: airepo
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+    container_name: airepo-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

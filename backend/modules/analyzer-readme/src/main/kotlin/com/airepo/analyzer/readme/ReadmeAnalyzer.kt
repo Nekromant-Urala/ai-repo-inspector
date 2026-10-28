@@ -16,8 +16,12 @@ import java.nio.file.Path
  * Проверяет, что в проекте есть README, и что он покрывает ключевые разделы:
  * описание проекта, инструкция по сборке/запуску, зависимости.
  *
- * TODO (mrrreowred): углубить — например, сверять указанную команду сборки
- * с фактическими файлами проекта (build.gradle.kts, package.json и т.д.).
+ * Реализовано (mrrreowred):
+ * - Поиск README теперь не только в корне, но и в папке `docs/`.
+ * - Поддержка русских ключевых слов для разделов (установка, сборка и т.д.).
+ * - Сверка указанных команд сборки (Gradle, NPM) с реальными файлами в проекте.
+ * - Проверка на минимальный объем README (чтобы отсеять пустышки).
+ *
  */
 @Component
 class ReadmeAnalyzer : CriterionAnalyzer {
@@ -25,35 +29,45 @@ class ReadmeAnalyzer : CriterionAnalyzer {
     override val id: String = "readme"
     override val name: String = "README"
 
-    /** Разделы, наличие которых в README желательно. */
+    // Ключевые слова для поиска разделов (добавлены русские варианты)
     private val requiredSections = listOf(
-        "install" to "Установка",
-        "build" to "Сборка",
-        "run" to "Запуск",
-        "usage" to "Использование",
+        listOf("install", "установка") to "Установка",
+        listOf("build", "сборка") to "Сборка",
+        listOf("run", "запуск", "start") to "Запуск",
+        listOf("usage", "использование") to "Использование",
     )
 
     override fun analyze(context: AnalysisContext): CriterionResult {
-        val readme = findReadme(context.rootDir)
+        val root = context.rootDir
+        val readme = findReadme(root)
+        
         if (readme == null) {
             return CriterionResult(
                 criterionId = id,
                 criterionName = name,
                 score = 0.0,
-                summary = "README не найден в корне проекта.",
-                findings = listOf(
-                    Finding(file = "README.md", severity = Severity.ERROR, message = "В проекте отсутствует README."),
-                ),
+                summary = "README не найден.",
+                findings = listOf(Finding(file = "README.md", severity = Severity.ERROR, message = "В проекте отсутствует README.")),
             )
         }
 
         val content = FileUtils.readTextSafely(readme) ?: ""
         val lower = content.lowercase()
         val findings = mutableListOf<Finding>()
-        var present = 0
+        
+        // 1. Проверка на минимальный объем
+        if (content.length < 200) {
+            findings += Finding(
+                file = readme.fileName.toString(),
+                severity = Severity.WARNING,
+                message = "README слишком короткий (менее 200 символов). Возможно, он неинформативен."
+            )
+        }
 
-        for ((keyword, sectionName) in requiredSections) {
-            if (keyword in lower || sectionName.lowercase() in lower) {
+        // 2. Проверка разделов
+        var present = 0
+        for ((keywords, sectionName) in requiredSections) {
+            if (keywords.any { it in lower }) {
                 present++
             } else {
                 findings += Finding(
@@ -64,18 +78,44 @@ class ReadmeAnalyzer : CriterionAnalyzer {
             }
         }
 
+        // 3. Проверка соответствия команд сборки реальности
+        if (lower.contains("gradlew") || lower.contains("gradle")) {
+            if (!Files.exists(root.resolve("build.gradle.kts")) && !Files.exists(root.resolve("build.gradle"))) {
+                findings += Finding(
+                    file = readme.fileName.toString(),
+                    severity = Severity.INFO,
+                    message = "В README упоминается Gradle, но в проекте нет build.gradle(.kts).",
+                )
+            }
+        }
+        if (lower.contains("npm") || lower.contains("yarn") || lower.contains("pnpm")) {
+            if (!Files.exists(root.resolve("package.json"))) {
+                findings += Finding(
+                    file = readme.fileName.toString(),
+                    severity = Severity.INFO,
+                    message = "В README упоминаются JS-пакетные менеджеры, но нет package.json.",
+                )
+            }
+        }
+
         val ratio = if (requiredSections.isEmpty()) 1.0 else present.toDouble() / requiredSections.size
+        var score = ratio * 100
+        // Если нет файлов сборки, но README говорит о них — немного снижаем балл
+        score -= findings.count { it.severity == Severity.INFO } * 10.0
+
         return CriterionResult(
             criterionId = id,
             criterionName = name,
-            score = ratio * 100,
-            summary = "README найден, покрытие ключевых разделов: $present/${requiredSections.size}.",
+            score = score.coerceIn(0.0, 100.0),
+            summary = "README найден. Покрытие разделов: $present/${requiredSections.size}.",
             findings = findings,
         )
     }
 
-    private fun findReadme(root: Path): Path? =
-        listOf("README.md", "Readme.md", "readme.md", "README.MD")
-            .map { root.resolve(it) }
-            .firstOrNull { Files.isRegularFile(it) }
+    // Ищем README в корне или в docs/
+    private fun findReadme(root: Path): Path? {
+        val names = listOf("README.md", "Readme.md", "readme.md", "README.MD", "README", "README.txt")
+        val possiblePaths = names.flatMap { listOf(root.resolve(it), root.resolve("docs").resolve(it)) }
+        return possiblePaths.firstOrNull { Files.isRegularFile(it) }
+    }
 }

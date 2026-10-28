@@ -14,11 +14,11 @@ const nonBlank: ValidatorFn = control =>
       (cancel)="close()" (click)="backdropClick($event)">
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
         <div class="dialog-heading">
-          <div><p class="eyebrow">ВАШ ПОДХОД К КАЧЕСТВУ</p>
+          <div><p class="eyebrow">ДОПОЛНИТЕЛЬНЫЙ КРИТЕРИЙ</p>
             <h2 id="criterion-title">{{ criterion ? 'Изменить критерий' : 'Новый критерий' }}</h2></div>
           <button class="icon-button" type="button" aria-label="Закрыть окно" (click)="close()">×</button>
         </div>
-        <p class="muted">Опишите, на что обратить внимание и как оценить результат.</p>
+        <p class="muted">Укажите, что проверить и как выставить оценку.</p>
         <label for="criterion-name">Название</label>
         <input id="criterion-name" autofocus formControlName="name" maxlength="120"
           placeholder="Например, доступность интерфейса" [attr.aria-invalid]="invalid('name')"
@@ -26,12 +26,12 @@ const nonBlank: ValidatorFn = control =>
         <p id="criterion-name-error" class="field-error">{{ invalid('name') ? 'Введите название критерия.' : '' }}</p>
         <label for="criterion-scale">Шкала оценивания</label>
         <input id="criterion-scale" formControlName="scale" maxlength="160"
-          placeholder="0–10, где 10 — полное соответствие" [attr.aria-invalid]="invalid('scale')"
+          placeholder="От 0 до 10: чем выше, тем лучше" [attr.aria-invalid]="invalid('scale')"
           aria-describedby="criterion-scale-error">
         <p id="criterion-scale-error" class="field-error">{{ invalid('scale') ? 'Укажите шкалу оценивания.' : '' }}</p>
-        <label for="criterion-description">Описание</label>
+        <label for="criterion-description">Что проверить</label>
         <textarea id="criterion-description" formControlName="description" maxlength="2000" rows="4"
-          placeholder="Что нужно проверить? Какие признаки важны для оценки?"
+          placeholder="Например, подписи полей и управление с клавиатуры"
           [attr.aria-invalid]="invalid('description')" aria-describedby="criterion-description-error"></textarea>
         <p id="criterion-description-error" class="field-error">{{ invalid('description') ? 'Опишите, что нужно проверить.' : '' }}</p>
         <div class="dialog-actions">

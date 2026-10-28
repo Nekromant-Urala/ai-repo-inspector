@@ -1,7 +1,7 @@
 <section class="page-intro">
-  <p class="eyebrow"><span class="small-dot"></span> АУДИТ РЕПОЗИТОРИЯ</p>
-  <h1>У каждого проекта<br>есть <span class="accent">точки роста.</span></h1>
-  <p class="intro-copy">Узнайте, что уже сделано хорошо, а что стоит улучшить.<br class="desktop-break"> Один проект — понятный отчёт по всем критериям.</p>
+  <p class="eyebrow"><span class="small-dot"></span> AI-REPO INSPECTOR</p>
+  <h1>Интеллектуальная проверка <span class="accent">проекта</span></h1>
+  <p class="intro-copy">Укажите ссылку на репозиторий.<br class="desktop-break"> В отчёте будут оценки и найденные замечания.</p>
 </section>
 
 <div class="submit-layout">
@@ -9,12 +9,12 @@
     @if (flow.busy()) {
       <div class="notice notice-info" role="status">
         Проверка уже выполняется.
-        @if (flow.check(); as check) { <a [routerLink]="['/checks', check.id, 'wait']">Вернуться к анализу →</a> }
+        @if (flow.check(); as check) { <a [routerLink]="['/checks', check.id, 'wait']">Вернуться к проверке →</a> }
       </div>
     }
     <form class="panel project-form" (submit)="$event.preventDefault(); submit()" novalidate [attr.aria-busy]="flow.busy()">
-      <div class="section-heading"><span class="section-number">01</span><h2>Добавьте проект</h2></div>
-      <p class="muted section-description">Выберите, откуда загрузить исходный код.</p>
+      <div class="section-heading"><span class="section-number">01</span><h2>Проект для проверки</h2></div>
+      <p class="muted section-description">Вставьте ссылку или выберите архив.</p>
       <div class="source-switch" role="group" aria-label="Источник проекта">
         <button type="button" [class.selected]="flow.sourceType === 'GIT_URL'" [attr.aria-pressed]="flow.sourceType === 'GIT_URL'"
           [disabled]="flow.busy()" (click)="setSource('GIT_URL')"><span aria-hidden="true">⑂</span> Ссылка на репозиторий</button>
@@ -28,7 +28,7 @@
           <input id="repository-url" type="url" [formControl]="url" (input)="rememberUrl()" [readOnly]="flow.busy()"
             autocomplete="url" spellcheck="false" placeholder="https://github.com/owner/project"
             [attr.aria-invalid]="!!urlError" aria-describedby="url-help url-error"></div>
-        <p id="url-help" class="field-help">Публичный репозиторий на GitHub или GitLab.</p>
+        <p id="url-help" class="field-help">Репозиторий должен быть открытым, на GitHub или GitLab.</p>
         <p id="url-error" class="field-error" aria-live="polite">{{ urlError }}</p>
       } @else {
         <label for="project-archive">Архив с исходным кодом</label>
@@ -48,13 +48,13 @@
         }
         <p id="archive-error" class="field-error" aria-live="polite">{{ fileError }}</p>
         @if (!features.archiveUpload) {
-          <p class="notice notice-info">Загрузка архивов пока недоступна. Сейчас можно проверить проект по ссылке.</p>
+          <p class="notice notice-info">Архивы пока не поддерживаются. Укажите ссылку на репозиторий.</p>
         }
       }
 
       <div class="criteria-section">
-        <div class="criteria-heading"><div><h3>Свои критерии <span class="optional-label">необязательно</span></h3>
-          <p class="field-help">Укажите, что ещё важно для вашего проекта.</p></div>
+        <div class="criteria-heading"><div><h3>Дополнительные критерии <span class="optional-label">необязательно</span></h3>
+          <p class="field-help">Добавьте свои требования к проверке.</p></div>
           <button #addCriterionButton type="button" class="button button-small button-secondary" [disabled]="flow.busy()"
             (click)="openCriterion($event)"><span aria-hidden="true">+</span> Добавить</button></div>
         @for (criterion of flow.criteria(); track $index; let index = $index) {
@@ -66,27 +66,27 @@
               <button type="button" class="icon-button" [disabled]="flow.busy()" [attr.aria-label]="'Удалить критерий ' + criterion.name"
                 (click)="removeCriterion(index)">×</button></div></div>
         }
-        @if (!flow.criteria().length) { <div class="empty-criteria">Стандартные критерии уже включены в проверку.</div> }
+        @if (!flow.criteria().length) { <div class="empty-criteria">Можно оставить пустым.</div> }
         @if (flow.criteria().length && !features.customCriteria) {
-          <p class="notice notice-info">Критерии сохранены в форме. Их оценка пока недоступна — для стандартной проверки уберите их из списка.</p>
+          <p class="notice notice-info">Дополнительные критерии пока не поддерживаются. Удалите их из списка, чтобы проверить проект.</p>
         }
       </div>
 
       @if (flow.error()) { <div class="notice notice-error" role="alert">{{ flow.error() }}</div> }
       <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy()">
-        {{ flow.phase() === 'submitting' ? 'Отправляем проект…' : 'Проверить проект' }} <span aria-hidden="true">→</span>
-      </button><p class="field-help">Отчёт появится сразу после завершения анализа.</p></div>
+        {{ flow.phase() === 'submitting' ? 'Отправка…' : 'Начать проверку' }} <span aria-hidden="true">→</span>
+      </button><p class="field-help">После проверки отчёт откроется автоматически.</p></div>
     </form>
   </div>
 
   <aside class="modules-panel" aria-labelledby="modules-heading">
-    <div class="aside-heading"><p class="eyebrow">ВНУТРИ ПРОВЕРКИ</p><span class="count-badge">6 модулей</span></div>
-    <h2 id="modules-heading">Детали складываются<br> в общую картину.</h2>
-    <p class="muted">Каждый модуль смотрит на проект<br class="desktop-break"> со своей стороны.</p>
+    <div class="aside-heading"><p class="eyebrow">КРИТЕРИИ</p><span class="count-badge">Всего: 6</span></div>
+    <h2 id="modules-heading">Что входит<br> в проверку</h2>
+    <p class="muted">Оценки и замечания будут сгруппированы<br class="desktop-break"> по этим критериям.</p>
     <ul class="module-list">@for (module of modules; track module.name) {
       <li><span class="module-mark" aria-hidden="true">{{ module.mark }}</span><div><strong>{{ module.name }}</strong><span>{{ module.description }}</span></div></li>
     }</ul>
-    <div class="aside-note"><span class="small-dot"></span><p>Одна сводная оценка.<br>Конкретные замечания по каждому модулю.</p></div>
+    <div class="aside-note"><span class="small-dot"></span><p>Каждый критерий оценивается<br>по шкале от 0 до 100.</p></div>
   </aside>
 </div>
 

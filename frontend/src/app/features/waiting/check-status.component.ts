@@ -13,34 +13,34 @@ import { CheckResponse } from '../../core/check.models';
       <span class="state-symbol" aria-hidden="true">{{ loading() ? '⋯' : 'i' }}</span>
       <p class="eyebrow">ПРОВЕРКА #{{ id }}</p>
       @if (loading()) {
-        <h1>Уточняем статус</h1><p class="muted">Запрашиваем состояние проверки.</p>
+        <h1>Проверяем статус</h1><p class="muted">Получаем данные о проверке.</p>
       } @else if (error()) {
         <h1>Не удалось получить данные</h1><p class="muted">{{ error() }}</p>
       } @else {
         @if (check(); as item) {
         @switch (item.status) {
           @case ('DONE') {
-            <h1>Анализ завершён</h1>
-            <p class="muted">Отчёт из предыдущего сеанса недоступен. Сервис пока не сохраняет результаты для повторного просмотра.</p>
+            <h1>Проверка завершена</h1>
+            <p class="muted">Отчёты пока не сохраняются. Чтобы увидеть результат, запустите проверку ещё раз.</p>
           }
           @case ('RUNNING') {
-            <h1>Проект ещё анализируется</h1>
-            <p class="muted">Проверка выполняется. После обновления страницы связь с отчётом была потеряна; повторный запуск автоматически не выполняется.</p>
+            <h1>Проверка ещё идёт</h1>
+            <p class="muted">Здесь можно узнать статус проверки. Если страница с отчётом была закрыта или обновлена, восстановить его пока нельзя.</p>
           }
           @case ('PENDING') {
-            <h1>Проверка создана</h1>
-            <p class="muted">Анализ ещё не запущен. Начните новую проверку, чтобы получить отчёт в этом сеансе.</p>
+            <h1>Проверка ещё не началась</h1>
+            <p class="muted">Запрос принят, но проект ещё не проверялся. Начните новую проверку.</p>
           }
           @case ('FAILED') {
-            <h1>Проверка не завершилась</h1>
-            <p class="muted">Не удалось загрузить или проанализировать проект. Проверьте доступность репозитория и попробуйте снова.</p>
+            <h1>Не удалось проверить проект</h1>
+            <p class="muted">Проверьте, что репозиторий доступен по ссылке, и попробуйте ещё раз.</p>
           }
         }
         <p class="source-caption">{{ item.sourceValue }}</p>
         }
       }
       <div class="state-actions">
-        <a class="button button-primary" routerLink="/">К новой проверке <span aria-hidden="true">→</span></a>
+        <a class="button button-primary" routerLink="/">Новая проверка <span aria-hidden="true">→</span></a>
         <button class="button button-secondary" type="button" [disabled]="loading()" (click)="refresh()">Обновить статус</button>
       </div>
     </section>

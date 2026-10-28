@@ -1,6 +1,6 @@
 @if (report(); as result) {
   <section class="report-intro"><div><p class="eyebrow"><span class="small-dot"></span> ПРОВЕРКА #{{ result.checkId }} ЗАВЕРШЕНА</p>
-    <h1>Проект в деталях.</h1><p class="muted">Результаты анализа и конкретные точки для улучшения.</p></div>
+    <h1>Результаты проверки</h1><p class="muted">Общая оценка и замечания по проекту.</p></div>
     <a class="button button-secondary" routerLink="/">Новая проверка <span aria-hidden="true">↗</span></a></section>
   <section class="panel report-summary" aria-labelledby="summary-heading">
     <div class="score-block"><span class="score-value">{{ result.overallScore | number:'1.0-1' }}</span><span class="score-out-of">/ 100</span>
@@ -8,14 +8,14 @@
     <div class="summary-details"><h2 id="summary-heading">{{ result.source.type === 'GIT_URL' ? 'Репозиторий' : 'Архив проекта' }}</h2>
       @if (sourceLink(); as href) { <a class="report-source" [href]="href" target="_blank" rel="noopener noreferrer">{{ result.source.value }} ↗</a> }
       @else { <p class="report-source">{{ result.source.value }}</p> }
-      <div class="summary-counts"><span><strong>{{ result.criteria.length }}</strong> модулей в отчёте</span><span><strong>{{ totals().ALL }}</strong> замечаний</span></div>
+      <div class="summary-counts"><span>Критериев: <strong>{{ result.criteria.length }}</strong></span><span>Замечаний: <strong>{{ totals().ALL }}</strong></span></div>
       <div class="score-track" role="meter" aria-label="Общая оценка качества" [attr.aria-valuenow]="result.overallScore"
         aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="result.overallScore"></span></div>
     </div>
   </section>
-  <div class="results-heading"><div><p class="eyebrow">РЕЗУЛЬТАТЫ ПО МОДУЛЯМ</p><h2>От общего — к конкретному</h2></div><span class="field-help">Шкала оценивания: 0–100</span></div>
+  <div class="results-heading"><div><p class="eyebrow">ПОДРОБНОСТИ</p><h2>Результаты по критериям</h2></div><span class="field-help">Оценки: от 0 до 100</span></div>
   @if (totals().ALL) {
-    <div class="findings-filter" role="group" aria-label="Уровень замечаний">@for (item of filters; track item.key) {
+    <div class="findings-filter" role="group" aria-label="Тип замечаний">@for (item of filters; track item.key) {
       <button type="button" [class.selected]="filter() === item.key" [attr.aria-pressed]="filter() === item.key" (click)="filter.set(item.key)">
         {{ item.label }} <span>{{ totals()[item.key] }}</span></button>
     }</div>
@@ -35,17 +35,17 @@
           </div>
         } @empty {
           <p class="no-findings"><span aria-hidden="true">{{ criterion.findings.length ? '—' : '✓' }}</span>
-            {{ criterion.findings.length ? 'Замечаний выбранного уровня нет.' : 'Замечаний не найдено.' }}</p>
+            {{ criterion.findings.length ? 'Нет замечаний этого типа.' : 'Замечаний не найдено.' }}</p>
         }
       </article>
     } @empty {
-      <div class="panel empty-results"><h3>Модули не вернули результатов</h3><p class="muted">В полученном отчёте нет оценок. Попробуйте проверить другой проект.</p></div>
+      <div class="panel empty-results"><h3>Нет результатов по критериям</h3><p class="muted">В этом отчёте нет оценок. Можно запустить проверку ещё раз.</p></div>
     }
   </div>
 } @else {
   @if (id(); as checkId) { <app-check-status [id]="checkId" /> }
   @else {
-  <section class="panel state-card"><h1>Некорректный номер проверки</h1><p class="muted">Начните новую проверку, чтобы получить отчёт.</p>
-    <a class="button button-primary" routerLink="/">К новой проверке →</a></section>
+  <section class="panel state-card"><h1>Неверный номер проверки</h1><p class="muted">Проверьте ссылку или начните новую проверку.</p>
+    <a class="button button-primary" routerLink="/">Новая проверка →</a></section>
   }
 }

@@ -10,14 +10,14 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
     <div class="app-shell">
       <header class="site-header"><a routerLink="/" class="brand" aria-label="AI-Repo Inspector — главная">
         <span class="brand-mark" aria-hidden="true">↗</span><span>repo<span class="brand-light">inspector</span><sup>AI</sup></span></a>
-        <span class="header-caption"><span class="small-dot"></span> Взгляд на качество проекта</span></header>
+        <span class="header-caption"><span class="small-dot"></span> Проверка репозиториев</span></header>
       <nav class="steps" aria-label="Этапы проверки">
         <a routerLink="/" [class.active]="router.url === '/'"><span>01</span> Проект</a><span class="step-line"></span>
-        <span [class.active]="router.url.endsWith('/wait')"><span>02</span> Анализ</span><span class="step-line"></span>
+        <span [class.active]="router.url.endsWith('/wait')"><span>02</span> Проверка</span><span class="step-line"></span>
         <span [class.active]="router.url.endsWith('/report')"><span>03</span> Отчёт</span>
       </nav>
       <main id="main-content"><router-outlet /></main>
-      <footer class="site-footer"><span>AI-Repo Inspector</span><span>От исходного кода — к понятным улучшениям.</span></footer>
+      <footer class="site-footer"><span>AI-Repo Inspector</span><span>Оценка кода, документации и структуры</span></footer>
     </div>
   `,
 })

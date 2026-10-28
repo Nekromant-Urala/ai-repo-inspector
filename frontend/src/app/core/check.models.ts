@@ -58,7 +58,7 @@ export const CHECK_FEATURES = {
 } as const;
 
 export function repositoryUrlError(value: string): string | null {
-  if (!value.trim()) return 'Укажите ссылку на репозиторий.';
+  if (!value.trim()) return 'Вставьте ссылку на репозиторий.';
   try {
     const url = new URL(value.trim());
     const host = url.hostname.replace(/^www\./, '');
@@ -70,7 +70,7 @@ export function repositoryUrlError(value: string): string | null {
     if (parts.length < 2 || (host === 'github.com' && parts.length !== 2)
       || parts.includes('-') || parts.some(part => !/^[\w.-]+$/.test(part))
       || !parts[parts.length - 1]?.replace(/\.git$/, '')) {
-      return 'Укажите адрес самого репозитория, например https://github.com/owner/project.';
+      return 'Вставьте ссылку на репозиторий, например https://github.com/owner/project.';
     }
     return null;
   } catch {
@@ -79,8 +79,8 @@ export function repositoryUrlError(value: string): string | null {
 }
 
 export function archiveError(file: File): string | null {
-  if (!file.size) return 'Файл пуст. Выберите архив с файлами проекта.';
-  if (file.size > CHECK_FEATURES.maxArchiveBytes) return 'Размер архива не должен превышать 50 МиБ.';
+  if (!file.size) return 'Файл пуст. Выберите другой архив.';
+  if (file.size > CHECK_FEATURES.maxArchiveBytes) return 'Архив должен быть не больше 50 МиБ.';
   if (!CHECK_FEATURES.archiveExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
     return 'Выберите архив ZIP, RAR, TAR, TAR.GZ или TGZ.';
   }
@@ -125,7 +125,7 @@ export function readCheck(value: unknown): CheckResponse {
   if (!record(value) || !Number.isSafeInteger(value['id']) || Number(value['id']) < 1
     || !['PENDING', 'RUNNING', 'DONE', 'FAILED'].includes(String(value['status']))
     || !validSource({ type: value['sourceType'], value: value['sourceValue'] })) {
-    throw new Error('Сервис вернул некорректные данные проверки. Попробуйте позже.');
+    throw new Error('Не удалось загрузить данные проверки. Попробуйте позже.');
   }
   return value as unknown as CheckResponse;
 }
@@ -134,7 +134,7 @@ export function readReport(value: unknown): AnalysisReport {
   if (!record(value) || !Number.isSafeInteger(value['checkId']) || Number(value['checkId']) < 1
     || !validSource(value['source']) || !validScore(value['overallScore'])
     || !Array.isArray(value['criteria']) || !value['criteria'].every(validCriterion)) {
-    throw new Error('Не удалось прочитать отчёт: сервис вернул некорректные данные.');
+    throw new Error('Не удалось открыть отчёт. Начните новую проверку.');
   }
   return value as unknown as AnalysisReport;
 }

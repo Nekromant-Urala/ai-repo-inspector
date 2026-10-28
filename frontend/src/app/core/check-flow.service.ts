@@ -32,11 +32,11 @@ export class CheckFlowService {
       : input.file ? archiveError(input.file) : 'Выберите архив проекта.';
     if (validation) { this.error.set(validation); return; }
     if (input.type === 'ARCHIVE' && !CHECK_FEATURES.archiveUpload) {
-      this.error.set('Загрузка архивов пока недоступна. Для проверки укажите ссылку на репозиторий.');
+      this.error.set('Архивы пока не поддерживаются. Укажите ссылку на репозиторий.');
       return;
     }
     if (input.customCriteria.length && !CHECK_FEATURES.customCriteria) {
-      this.error.set('Проверка дополнительных критериев пока недоступна. Уберите их из формы, чтобы запустить стандартную проверку.');
+      this.error.set('Дополнительные критерии пока не поддерживаются. Удалите их из списка, чтобы проверить проект.');
       return;
     }
     this.phase.set('submitting');
@@ -44,7 +44,7 @@ export class CheckFlowService {
     try {
       const check = await firstValueFrom(this.api.create(input));
       this.check.set(check);
-      if (check.status !== 'PENDING') throw new Error('Созданная проверка имеет неожиданный статус. Начните новую проверку.');
+      if (check.status !== 'PENDING') throw new Error('Не удалось запустить проверку. Попробуйте ещё раз.');
       this.phase.set('running');
       await this.router.navigate(['/checks', check.id, 'wait']);
       const report = await firstValueFrom(this.api.run(check.id));

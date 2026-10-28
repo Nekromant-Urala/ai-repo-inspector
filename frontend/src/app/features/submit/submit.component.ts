@@ -28,11 +28,11 @@ export class SubmitComponent {
   private dialogTrigger: HTMLElement | null = null;
   readonly modules = [
     { mark: 'Aa', name: 'README', description: 'Документация и инструкции' },
-    { mark: '</>', name: 'Качество кода', description: 'Линтеры и проблемные места' },
+    { mark: '</>', name: 'Качество кода', description: 'Настройки линтера и пометки в коде' },
     { mark: '✓', name: 'Тестирование', description: 'Наличие тестов в проекте' },
     { mark: '▤', name: 'Структура', description: 'Организация файлов и папок' },
     { mark: '⑂', name: 'Git-история', description: 'История изменений' },
-    { mark: '◇', name: 'Безопасность', description: 'Секреты и ключи в коде' },
+    { mark: '◇', name: 'Безопасность', description: 'Ключи и токены в коде' },
   ];
 
   get urlError(): string | null {

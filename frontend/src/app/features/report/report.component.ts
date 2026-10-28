@@ -20,7 +20,7 @@ export class ReportComponent {
   readonly filter = signal<Severity | 'ALL'>('ALL');
   readonly filters: { key: Severity | 'ALL'; label: string }[] = [
     { key: 'ALL', label: 'Все замечания' }, { key: 'ERROR', label: 'Ошибки' },
-    { key: 'WARNING', label: 'Предупреждения' }, { key: 'INFO', label: 'Информация' },
+    { key: 'WARNING', label: 'Предупреждения' }, { key: 'INFO', label: 'Примечания' },
   ];
   readonly totals = computed(() => {
     const totals = { ALL: 0, ERROR: 0, WARNING: 0, INFO: 0 };
@@ -39,6 +39,6 @@ export class ReportComponent {
   }
 
   label(severity: Severity): string {
-    return { ERROR: 'Ошибка', WARNING: 'Предупреждение', INFO: 'Информация' }[severity];
+    return { ERROR: 'Ошибка', WARNING: 'Предупреждение', INFO: 'Примечание' }[severity];
   }
 }

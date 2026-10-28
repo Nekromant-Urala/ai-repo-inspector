@@ -39,6 +39,9 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": { "buildTarget": "ai-repo-frontend:build:production" },
             "development": { "buildTarget": "ai-repo-frontend:build:development" }

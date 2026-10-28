@@ -1,0 +1,95 @@
+<section class="page-intro">
+  <p class="eyebrow"><span class="small-dot"></span> АУДИТ РЕПОЗИТОРИЯ</p>
+  <h1>У каждого проекта<br>есть <span class="accent">точки роста.</span></h1>
+  <p class="intro-copy">Узнайте, что уже сделано хорошо, а что стоит улучшить.<br class="desktop-break"> Один проект — понятный отчёт по всем критериям.</p>
+</section>
+
+<div class="submit-layout">
+  <div class="form-column">
+    @if (flow.busy()) {
+      <div class="notice notice-info" role="status">
+        Проверка уже выполняется.
+        @if (flow.check(); as check) { <a [routerLink]="['/checks', check.id, 'wait']">Вернуться к анализу →</a> }
+      </div>
+    }
+    <form class="panel project-form" (submit)="$event.preventDefault(); submit()" novalidate [attr.aria-busy]="flow.busy()">
+      <div class="section-heading"><span class="section-number">01</span><h2>Добавьте проект</h2></div>
+      <p class="muted section-description">Выберите, откуда загрузить исходный код.</p>
+      <div class="source-switch" role="group" aria-label="Источник проекта">
+        <button type="button" [class.selected]="flow.sourceType === 'GIT_URL'" [attr.aria-pressed]="flow.sourceType === 'GIT_URL'"
+          [disabled]="flow.busy()" (click)="setSource('GIT_URL')"><span aria-hidden="true">⑂</span> Ссылка на репозиторий</button>
+        <button type="button" [class.selected]="flow.sourceType === 'ARCHIVE'" [attr.aria-pressed]="flow.sourceType === 'ARCHIVE'"
+          [disabled]="flow.busy()" (click)="setSource('ARCHIVE')"><span aria-hidden="true">▤</span> Архив проекта</button>
+      </div>
+
+      @if (flow.sourceType === 'GIT_URL') {
+        <label for="repository-url">Ссылка на репозиторий</label>
+        <div class="input-with-icon"><span aria-hidden="true">↗</span>
+          <input id="repository-url" type="url" [formControl]="url" (input)="rememberUrl()" [readOnly]="flow.busy()"
+            autocomplete="url" spellcheck="false" placeholder="https://github.com/owner/project"
+            [attr.aria-invalid]="!!urlError" aria-describedby="url-help url-error"></div>
+        <p id="url-help" class="field-help">Публичный репозиторий на GitHub или GitLab.</p>
+        <p id="url-error" class="field-error" aria-live="polite">{{ urlError }}</p>
+      } @else {
+        <label for="project-archive">Архив с исходным кодом</label>
+        <div class="drop-zone" [class.dragging]="dragging" (dragover)="$event.preventDefault(); dragging = true"
+          (dragleave)="dragging = false" (drop)="onDrop($event)">
+          <span class="upload-symbol" aria-hidden="true">↑</span>
+          <p><strong>Перетащите архив сюда</strong><br><span class="muted">или выберите файл на компьютере</span></p>
+          <input #fileInput id="project-archive" type="file" class="file-input" accept=".zip,.rar,.tar,.tar.gz,.tgz"
+            [disabled]="flow.busy()" (change)="selectFile($event)" aria-describedby="archive-help archive-error">
+          <label for="project-archive" class="button button-secondary file-label">Выбрать файл</label>
+          <span id="archive-help" class="field-help">ZIP, RAR, TAR, TAR.GZ, TGZ · до 50 МиБ</span>
+        </div>
+        @if (flow.file; as file) {
+          <div class="selected-file"><span class="file-name">▤ &nbsp; {{ file.name }}</span>
+            <span class="muted">{{ fileSize(file.size) }}</span>
+            <button type="button" class="icon-button" [disabled]="flow.busy()" aria-label="Убрать архив" (click)="removeFile()">×</button></div>
+        }
+        <p id="archive-error" class="field-error" aria-live="polite">{{ fileError }}</p>
+        @if (!features.archiveUpload) {
+          <p class="notice notice-info">Загрузка архивов пока недоступна. Сейчас можно проверить проект по ссылке.</p>
+        }
+      }
+
+      <div class="criteria-section">
+        <div class="criteria-heading"><div><h3>Свои критерии <span class="optional-label">необязательно</span></h3>
+          <p class="field-help">Укажите, что ещё важно для вашего проекта.</p></div>
+          <button #addCriterionButton type="button" class="button button-small button-secondary" [disabled]="flow.busy()"
+            (click)="openCriterion($event)"><span aria-hidden="true">+</span> Добавить</button></div>
+        @for (criterion of flow.criteria(); track $index; let index = $index) {
+          <div class="custom-criterion"><div><strong>{{ criterion.name }}</strong><span class="criterion-scale">{{ criterion.scale }}</span>
+            <p>{{ criterion.description }}</p></div>
+            <div class="criterion-actions">
+              <button type="button" class="text-button" [disabled]="flow.busy()" [attr.aria-label]="'Изменить критерий ' + criterion.name"
+                (click)="openCriterion($event, index)">Изменить</button>
+              <button type="button" class="icon-button" [disabled]="flow.busy()" [attr.aria-label]="'Удалить критерий ' + criterion.name"
+                (click)="removeCriterion(index)">×</button></div></div>
+        }
+        @if (!flow.criteria().length) { <div class="empty-criteria">Стандартные критерии уже включены в проверку.</div> }
+        @if (flow.criteria().length && !features.customCriteria) {
+          <p class="notice notice-info">Критерии сохранены в форме. Их оценка пока недоступна — для стандартной проверки уберите их из списка.</p>
+        }
+      </div>
+
+      @if (flow.error()) { <div class="notice notice-error" role="alert">{{ flow.error() }}</div> }
+      <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy()">
+        {{ flow.phase() === 'submitting' ? 'Отправляем проект…' : 'Проверить проект' }} <span aria-hidden="true">→</span>
+      </button><p class="field-help">Отчёт появится сразу после завершения анализа.</p></div>
+    </form>
+  </div>
+
+  <aside class="modules-panel" aria-labelledby="modules-heading">
+    <div class="aside-heading"><p class="eyebrow">ВНУТРИ ПРОВЕРКИ</p><span class="count-badge">6 модулей</span></div>
+    <h2 id="modules-heading">Детали складываются<br> в общую картину.</h2>
+    <p class="muted">Каждый модуль смотрит на проект<br class="desktop-break"> со своей стороны.</p>
+    <ul class="module-list">@for (module of modules; track module.name) {
+      <li><span class="module-mark" aria-hidden="true">{{ module.mark }}</span><div><strong>{{ module.name }}</strong><span>{{ module.description }}</span></div></li>
+    }</ul>
+    <div class="aside-note"><span class="small-dot"></span><p>Одна сводная оценка.<br>Конкретные замечания по каждому модулю.</p></div>
+  </aside>
+</div>
+
+@if (dialogOpen) {
+  <app-criterion-dialog [criterion]="editingCriterion" (saved)="saveCriterion($event)" (closed)="closeDialog()" />
+}

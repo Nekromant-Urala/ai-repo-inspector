@@ -1,18 +1,24 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
+  imports: [RouterLink, RouterOutlet],
   template: `
-    <main class="shell">
-      <h1>AI-Repo Inspector</h1>
-      <p>Интеллектуальный аудитор качества Git-репозиториев.</p>
-      <!-- TODO: поле ввода ссылки GitHub/GitLab + загрузка архива,
-           страница ожидания, вывод отчёта по критериям. -->
-    </main>
+    <a class="skip-link" href="#main-content">К содержимому</a>
+    <div class="app-shell">
+      <header class="site-header"><a routerLink="/" class="brand" aria-label="AI-Repo Inspector — главная">
+        <span class="brand-mark" aria-hidden="true">↗</span><span>repo<span class="brand-light">inspector</span><sup>AI</sup></span></a>
+        <span class="header-caption"><span class="small-dot"></span> Взгляд на качество проекта</span></header>
+      <nav class="steps" aria-label="Этапы проверки">
+        <a routerLink="/" [class.active]="router.url === '/'"><span>01</span> Проект</a><span class="step-line"></span>
+        <span [class.active]="router.url.endsWith('/wait')"><span>02</span> Анализ</span><span class="step-line"></span>
+        <span [class.active]="router.url.endsWith('/report')"><span>03</span> Отчёт</span>
+      </nav>
+      <main id="main-content"><router-outlet /></main>
+      <footer class="site-footer"><span>AI-Repo Inspector</span><span>От исходного кода — к понятным улучшениям.</span></footer>
+    </div>
   `,
-  styles: [`
-    .shell { font-family: system-ui, sans-serif; max-width: 720px; margin: 48px auto; padding: 0 16px; }
-  `],
 })
-export class AppComponent {}
+export class AppComponent { readonly router = inject(Router); }

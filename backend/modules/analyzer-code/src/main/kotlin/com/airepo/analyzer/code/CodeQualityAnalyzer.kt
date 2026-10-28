@@ -8,6 +8,7 @@ import com.airepo.domain.Finding
 import com.airepo.domain.Severity
 import org.springframework.stereotype.Component
 import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Критерий «Качество кода».
@@ -15,8 +16,15 @@ import java.nio.file.Files
  * Проверяет, что проект использует линтер/форматтер и что в нём нет явных
  * признаков небрежности (закомментированный код, TODO-маркеры и т.п.).
  *
- * TODO: по-настоящему запускать линтеры (ktlint, ESLint, Ruff...) на склонированном
- * проекте и собирать найденные замечания.
+ * Реализовано (mrrreowred):
+ * - Расширен список распознаваемых конфигов линтеров (добавлены pyproject.toml, eslint.config.js и др.).
+ * - Поиск маркеров TODO/FIXME/HACK теперь идет по границам слов (через Regex), 
+ *   чтобы не находить ложные срабатывания в словах вроде "METHOD".
+ * - Игнорируются системные папки (node_modules, build, dist, .git и т.д.), 
+ *   чтобы не засчитывать TODO из сторонних библиотек.
+ * - Добавлено ограничение на размер файла (пропускаются файлы > 2MB).
+ * - Расширен список проверяемых расширений (добавлены jsx, vue, svelte, c, cpp, php и др.).
+ *
  */
 @Component
 class CodeQualityAnalyzer : CriterionAnalyzer {
@@ -24,21 +32,26 @@ class CodeQualityAnalyzer : CriterionAnalyzer {
     override val id: String = "code-quality"
     override val name: String = "Качество кода"
 
-    /** Файлы конфигурации популярных линтеров/форматтеров. */
+    // Расширенный список популярных конфигов
     private val lintConfigs = listOf(
         ".editorconfig",
-        ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
+        ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", "eslint.config.js",
         ".prettierrc", ".prettierrc.json",
-        ".ktlint", ".ruff.toml", "ruff.toml",
+        ".ktlint", "pyproject.toml", "setup.cfg", "tox.ini", ".flake8",
+        ".golangci.yml", "rustfmt.toml", "clippy.toml"
     )
 
-    /** Маркеры небрежности в исходниках. */
-    private val redFlags = listOf("TODO", "FIXME", "HACK")
+    // Папки, которые нужно игнорировать при поиске маркеров
+    private val ignoredDirs = setOf("node_modules", "build", "dist", "target", ".git", "vendor", "out", "bin")
+
+    // Регулярка ищет слова TODO, FIXME, HACK как отдельные слова
+    private val redFlagRegex = Regex("\\b(TODO|FIXME|HACK)\\b")
 
     override fun analyze(context: AnalysisContext): CriterionResult {
         val root = context.rootDir
         val findings = mutableListOf<Finding>()
 
+        // 1. Проверка конфигов
         val hasLintConfig = lintConfigs.any { Files.isRegularFile(root.resolve(it)) }
         if (!hasLintConfig) {
             findings += Finding(
@@ -47,24 +60,42 @@ class CodeQualityAnalyzer : CriterionAnalyzer {
             )
         }
 
+        // 2. Поиск маркеров в файлах
         var flaggedFiles = 0
         FileUtils.listFilesRecursively(root)
             .asSequence()
+            .filter { file ->
+                // Игнорируем ненужные папки
+                val pathStr = root.relativize(file).toString().replace("\\", "/")
+                ignoredDirs.none { pathStr.contains("$it/") || pathStr.startsWith("$it/") }
+            }
             .filter { FileUtils.extensionOf(it) in sourceExtensions }
             .forEach { file ->
+                // Игнорируем слишком большие файлы (> 2MB)
+                try {
+                    if (Files.size(file) > 2 * 1024 * 1024) return@forEach
+                } catch (e: Exception) { return@forEach }
+
                 val content = FileUtils.readTextSafely(file) ?: return@forEach
-                if (redFlags.any { content.contains(it) }) {
+                val matchResult = redFlagRegex.find(content)
+                
+                if (matchResult != null) {
                     flaggedFiles++
-                    if (findings.size < 10) {
+                    if (findings.size < 10) { // Не засоряем отчет
+                        val marker = matchResult.value
+                        val line = content.substring(0, matchResult.range.first).count { it == '\n' } + 1
+                        
                         findings += Finding(
                             file = root.relativize(file).toString(),
-                            severity = Severity.INFO,
-                            message = "В файле встречаются маркеры ${redFlags.joinToString("/")}.",
+                            line = line,
+                            severity = if (marker == "TODO") Severity.INFO else Severity.WARNING,
+                            message = "Найден маркер $marker.",
                         )
                     }
                 }
             }
 
+        // 3. Подсчет очков
         var score = 100.0
         if (!hasLintConfig) score -= 40
         if (flaggedFiles > 0) score -= minOf(30.0, flaggedFiles * 5.0)
@@ -74,12 +105,15 @@ class CodeQualityAnalyzer : CriterionAnalyzer {
             criterionId = id,
             criterionName = name,
             score = score,
-            summary = "Конфиг линтера: ${if (hasLintConfig) "есть" else "нет"}; файлов с маркерами TODO/FIXME: $flaggedFiles.",
+            summary = "Конфиг линтера: ${if (hasLintConfig) "есть" else "нет"}; файлов с маркерами: $flaggedFiles.",
             findings = findings,
         )
     }
 
     private companion object {
-        val sourceExtensions = setOf("kt", "java", "kts", "py", "js", "ts", "tsx", "go", "rs")
+        val sourceExtensions = setOf(
+            "kt", "java", "kts", "py", "js", "ts", "tsx", "jsx", "vue", "svelte", 
+            "go", "rs", "c", "cpp", "h", "hpp", "cs", "php", "rb", "swift", "scala", "sh"
+        )
     }
 }

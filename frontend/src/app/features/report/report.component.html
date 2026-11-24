@@ -42,8 +42,16 @@
       <div class="panel empty-results"><h3>Нет результатов по критериям</h3><p class="muted">В этом отчёте нет оценок. Можно запустить проверку ещё раз.</p></div>
     }
   </div>
-} @else {
-  @if (id(); as checkId) { <app-check-status [id]="checkId" /> }
+  @if (result.customCriteria?.length) {
+    <h2>Дополнительные критерии</h2>
+    @for (item of result.customCriteria; track $index) {
+      <article class="panel criterion-card"><h3>{{ item.name }}</h3><p>{{ item.description }}</p>
+      <p>Шкала: {{ item.scale }}</p><strong>{{ item.score == null ? 'Требует ручной оценки' : item.score + ' / 100' }}</strong></article>
+    }
+  }
+} @else if (report() === undefined) { <p role="status">Загрузка отчёта…</p> } @else {
+  @if (id(); as checkId) { <section class="panel state-card"><h2>Отчёт пока недоступен</h2>
+    <a [routerLink]="['/checks', checkId, 'wait']">Посмотреть статус проверки</a></section> }
   @else {
   <section class="panel state-card"><h1>Неверный номер проверки</h1><p class="muted">Проверьте ссылку или начните новую проверку.</p>
     <a class="button button-primary" routerLink="/">Новая проверка →</a></section>

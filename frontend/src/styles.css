@@ -249,3 +249,8 @@ h3 { font-size: 16px; font-weight: 650; line-height: 1.4; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.batch-results { margin-top: 1rem; padding: 1.25rem; overflow-x: auto; }
+.batch-results table { width: 100%; border-collapse: collapse; text-align: left; }
+.batch-results th, .batch-results td { padding: .7rem; border-bottom: 1px solid #ddd; overflow-wrap: anywhere; }
+.source-switch { flex-wrap: wrap; }

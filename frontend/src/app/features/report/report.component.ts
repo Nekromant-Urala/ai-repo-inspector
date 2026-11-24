@@ -1,22 +1,28 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, of, startWith, switchMap } from 'rxjs';
+import { CheckApiService } from '../../core/check-api.service';
 import { CheckFlowService } from '../../core/check-flow.service';
 import { Finding, parseCheckId, repositoryUrlError, Severity } from '../../core/check.models';
-import { CheckStatusComponent } from '../waiting/check-status.component';
 
 @Component({
   selector: 'app-report',
   standalone: true,
-  imports: [DecimalPipe, RouterLink, CheckStatusComponent],
+  imports: [DecimalPipe, RouterLink],
   templateUrl: './report.component.html',
 })
 export class ReportComponent {
   readonly flow = inject(CheckFlowService);
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   readonly id = computed(() => parseCheckId(this.params()?.get('id') ?? null));
-  readonly report = computed(() => this.flow.reports()[this.id() ?? 0] ?? null);
+  private readonly api = inject(CheckApiService);
+  readonly report = toSignal(toObservable(this.id).pipe(switchMap(id => {
+    if (!id) return of(null);
+    const cached = this.flow.reports()[id];
+    return cached ? of(cached) : this.api.report(id).pipe(startWith(undefined), catchError(() => of(null)));
+  })));
   readonly filter = signal<Severity | 'ALL'>('ALL');
   readonly filters: { key: Severity | 'ALL'; label: string }[] = [
     { key: 'ALL', label: 'Все замечания' }, { key: 'ERROR', label: 'Ошибки' },

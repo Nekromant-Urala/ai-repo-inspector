@@ -2,7 +2,7 @@ import { Component, ElementRef, inject, ViewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CheckFlowService } from '../../core/check-flow.service';
-import { archiveError, CHECK_FEATURES, CustomCriterion, repositoryUrlError, SourceType } from '../../core/check.models';
+import { archiveError, CustomCriterion, repositoryUrlError, SourceType } from '../../core/check.models';
 import { CriterionDialogComponent } from '../custom-criteria/criterion-dialog.component';
 
 @Component({
@@ -13,7 +13,6 @@ import { CriterionDialogComponent } from '../custom-criteria/criterion-dialog.co
 })
 export class SubmitComponent {
   readonly flow = inject(CheckFlowService);
-  readonly features = CHECK_FEATURES;
   readonly url = new FormControl(this.flow.url, {
     nonNullable: true,
     validators: [control => repositoryUrlError(control.value) ? { repositoryUrl: true } : null],
@@ -43,7 +42,39 @@ export class SubmitComponent {
     return this.editingIndex === null ? null : this.flow.criteria()[this.editingIndex] ?? null;
   }
 
-  setSource(type: SourceType): void {
+  listUrls: string[] = [];
+  listMessage = '';
+  reading = false;
+
+  async readList(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    this.listUrls = [];
+    this.listMessage = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.txt') || file.size > 1024 * 1024) {
+      this.listMessage = 'Выберите TXT до 1 МиБ.'; return;
+    }
+    this.reading = true;
+    try {
+      const urls = new Set<string>();
+      const invalid: number[] = [];
+      const lines = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer()).split(/\r?\n/);
+      lines.forEach((line, i) => {
+        const url = line.trim();
+        if (!url) return;
+        if (repositoryUrlError(url)) { invalid.push(i + 1); return; }
+        const normalized = new URL(url);
+        normalized.hostname = normalized.hostname.replace(/^www\./, '');
+        urls.add(normalized.href.replace(/\/$/, '').replace(/\.git$/, ''));
+      });
+      this.listUrls = urls.size <= 20 ? [...urls] : [];
+      this.listMessage = urls.size > 20 ? 'Максимум 20 репозиториев.' : 'Подходящих ссылок: ' + urls.size;
+      if (invalid.length) this.listMessage += '. Ошибки в строках: ' + invalid.slice(0, 20).join(', ');
+    } catch { this.listMessage = 'Не удалось прочитать файл в UTF-8.'; }
+    finally { this.reading = false; }
+  }
+
+  setSource(type: SourceType | 'LIST'): void {
     if (this.flow.busy()) return;
     this.flow.sourceType = type;
     this.flow.error.set('');
@@ -105,6 +136,7 @@ export class SubmitComponent {
 
   submit(): void {
     if (this.flow.busy()) return;
+    if (this.flow.sourceType === 'LIST') { void this.flow.runBatch(this.listUrls); return; }
     this.submitted = true;
     this.url.markAsTouched();
     this.flow.url = this.url.value;

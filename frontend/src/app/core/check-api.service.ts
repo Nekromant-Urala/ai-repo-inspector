@@ -31,6 +31,10 @@ export class CheckApiService {
     }));
   }
 
+  report(id: number) {
+    return this.http.get<unknown>('/api/checks/' + id + '/report').pipe(map(readReport));
+  }
+
   status(id: number) {
     return this.http.get<unknown>(`/api/checks/${id}`).pipe(timeout(15_000), map(value => {
       const check = readCheck(value);

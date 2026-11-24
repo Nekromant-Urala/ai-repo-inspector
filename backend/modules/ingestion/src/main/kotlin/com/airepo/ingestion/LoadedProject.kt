@@ -11,4 +11,13 @@ data class LoadedProject(
     val rootDir: Path,
     /** Исходный источник, по которому загружали. */
     val source: RepositorySource,
-)
+    val workspace: Path = rootDir,
+) : AutoCloseable {
+    override fun close() = removeWorkspace(workspace)
+}
+
+internal fun removeWorkspace(root: Path) {
+    java.nio.file.Files.walk(root).use { paths ->
+        paths.sorted(Comparator.reverseOrder()).forEach(java.nio.file.Files::delete)
+    }
+}

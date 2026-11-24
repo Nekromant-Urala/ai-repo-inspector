@@ -20,10 +20,10 @@ class ProjectCheckService(
      * Создаёт новую задачу в статусе PENDING.
      */
     @Transactional
-    fun create(source: RepositorySource): ProjectCheckEntity {
+    fun create(source: RepositorySource, criteriaJson: String? = null, archive: ByteArray? = null): ProjectCheckEntity {
         val entity = ProjectCheckEntity(
             status = CheckStatus.PENDING,
-            sourceType = source.type,
+            sourceType = source.type, criteriaJson = criteriaJson, archive = archive,
             sourceValue = source.value,
         )
         return repository.save(entity)
@@ -35,8 +35,20 @@ class ProjectCheckService(
     @Transactional
     fun updateStatus(id: Long, status: CheckStatus) {
         val entity = requireNotNull(repository.findById(id).orElse(null)) { "Check $id not found" }
+        if (status == CheckStatus.FAILED) entity.archive = null
         entity.status = status
         repository.save(entity)
+    }
+
+    @Transactional
+    fun start(id: Long) = repository.transition(id, CheckStatus.PENDING, CheckStatus.RUNNING) == 1
+
+    @Transactional
+    fun finish(id: Long, report: String) {
+        val entity = repository.findById(id).orElseThrow()
+        entity.reportJson = report
+        entity.archive = null
+        entity.status = CheckStatus.DONE
     }
 
     @Transactional(readOnly = true)

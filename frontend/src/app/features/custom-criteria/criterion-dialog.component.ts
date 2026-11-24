@@ -18,7 +18,7 @@ const nonBlank: ValidatorFn = control =>
             <h2 id="criterion-title">{{ criterion ? 'Изменить критерий' : 'Новый критерий' }}</h2></div>
           <button class="icon-button" type="button" aria-label="Закрыть окно" (click)="close()">×</button>
         </div>
-        <p class="muted">Укажите, что проверить и как выставить оценку.</p>
+        <p class="muted">Для автоматической проверки наличия файла укажите «Файл: README.md» в описании. Остальные требования попадут в отчёт для ручной оценки.</p>
         <label for="criterion-name">Название</label>
         <input id="criterion-name" autofocus formControlName="name" maxlength="120"
           placeholder="Например, доступность интерфейса" [attr.aria-invalid]="invalid('name')"

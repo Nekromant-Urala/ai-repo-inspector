@@ -39,6 +39,7 @@ export interface AnalysisReport {
   checkId: number;
   source: RepositorySource;
   overallScore: number;
+  customCriteria?: (CustomCriterion & {score: number | null})[];
   criteria: CriterionResult[];
 }
 
@@ -49,12 +50,9 @@ export interface CheckSubmission {
   customCriteria: CustomCriterion[];
 }
 
-// Enable only after the corresponding backend contracts are implemented.
-export const CHECK_FEATURES = {
-  archiveUpload: false,
-  customCriteria: false,
+const ARCHIVE_LIMITS = {
   maxArchiveBytes: 50 * 1024 * 1024,
-  archiveExtensions: ['.zip', '.rar', '.tar', '.tar.gz', '.tgz'],
+  archiveExtensions: ['.zip'],
 } as const;
 
 export function repositoryUrlError(value: string): string | null {
@@ -80,9 +78,9 @@ export function repositoryUrlError(value: string): string | null {
 
 export function archiveError(file: File): string | null {
   if (!file.size) return 'Файл пуст. Выберите другой архив.';
-  if (file.size > CHECK_FEATURES.maxArchiveBytes) return 'Архив должен быть не больше 50 МиБ.';
-  if (!CHECK_FEATURES.archiveExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
-    return 'Выберите архив ZIP, RAR, TAR, TAR.GZ или TGZ.';
+  if (file.size > ARCHIVE_LIMITS.maxArchiveBytes) return 'Архив должен быть не больше 50 МиБ.';
+  if (!ARCHIVE_LIMITS.archiveExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+    return 'Выберите архив ZIP.';
   }
   return null;
 }

@@ -37,4 +37,10 @@ class ProjectCheckEntity(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
+    @Column(columnDefinition = "text")
+    var reportJson: String? = null,
+    @Column(columnDefinition = "text")
+    val criteriaJson: String? = null,
+    @Column(columnDefinition = "bytea")
+    var archive: ByteArray? = null,
 )

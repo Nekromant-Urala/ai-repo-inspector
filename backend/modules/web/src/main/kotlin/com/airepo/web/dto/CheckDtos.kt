@@ -12,6 +12,7 @@ import com.airepo.domain.SourceType
 data class CreateCheckRequest(
     val type: SourceType,
     val value: String,
+    val customCriteria: List<CustomCriterion> = emptyList(),
 )
 
 /**
@@ -23,3 +24,4 @@ data class CheckResponse(
     val sourceType: SourceType,
     val sourceValue: String,
 )
+data class CustomCriterion(val name: String, val scale: String, val description: String)

@@ -1,7 +1,7 @@
 <section class="page-intro">
   <p class="eyebrow"><span class="small-dot"></span> AI-REPO INSPECTOR</p>
   <h1>Интеллектуальная проверка <span class="accent">проекта</span></h1>
-  <p class="intro-copy">Укажите ссылку на репозиторий.<br class="desktop-break"> В отчёте будут оценки и найденные замечания.</p>
+  <p class="intro-copy">Выберите проект или загрузите список репозиториев.<br class="desktop-break"> В отчёте будут оценки и найденные замечания.</p>
 </section>
 
 <div class="submit-layout">
@@ -14,12 +14,13 @@
     }
     <form class="panel project-form" (submit)="$event.preventDefault(); submit()" novalidate [attr.aria-busy]="flow.busy()">
       <div class="section-heading"><span class="section-number">01</span><h2>Проект для проверки</h2></div>
-      <p class="muted section-description">Вставьте ссылку или выберите архив.</p>
+      <p class="muted section-description">Выберите способ загрузки.</p>
       <div class="source-switch" role="group" aria-label="Источник проекта">
         <button type="button" [class.selected]="flow.sourceType === 'GIT_URL'" [attr.aria-pressed]="flow.sourceType === 'GIT_URL'"
           [disabled]="flow.busy()" (click)="setSource('GIT_URL')"><span aria-hidden="true">⑂</span> Ссылка на репозиторий</button>
         <button type="button" [class.selected]="flow.sourceType === 'ARCHIVE'" [attr.aria-pressed]="flow.sourceType === 'ARCHIVE'"
           [disabled]="flow.busy()" (click)="setSource('ARCHIVE')"><span aria-hidden="true">▤</span> Архив проекта</button>
+        <button type="button" [class.selected]="flow.sourceType === 'LIST'" [disabled]="flow.busy()" (click)="setSource('LIST')">Список ссылок</button>
       </div>
 
       @if (flow.sourceType === 'GIT_URL') {
@@ -30,16 +31,21 @@
             [attr.aria-invalid]="!!urlError" aria-describedby="url-help url-error"></div>
         <p id="url-help" class="field-help">Репозиторий должен быть открытым, на GitHub или GitLab.</p>
         <p id="url-error" class="field-error" aria-live="polite">{{ urlError }}</p>
+      } @else if (flow.sourceType === 'LIST') {
+        <label for="repo-list">Список репозиториев</label>
+        <input id="repo-list" type="file" accept=".txt" [disabled]="reading || flow.batchBusy()" (change)="readList($event)">
+        <p class="field-help">TXT в UTF-8, одна ссылка на строку, до 20 репозиториев.</p>
+        <p role="status">{{ listMessage }}</p>
       } @else {
         <label for="project-archive">Архив с исходным кодом</label>
         <div class="drop-zone" [class.dragging]="dragging" (dragover)="$event.preventDefault(); dragging = true"
           (dragleave)="dragging = false" (drop)="onDrop($event)">
           <span class="upload-symbol" aria-hidden="true">↑</span>
           <p><strong>Перетащите архив сюда</strong><br><span class="muted">или выберите файл на компьютере</span></p>
-          <input #fileInput id="project-archive" type="file" class="file-input" accept=".zip,.rar,.tar,.tar.gz,.tgz"
+          <input #fileInput id="project-archive" type="file" class="file-input" accept=".zip"
             [disabled]="flow.busy()" (change)="selectFile($event)" aria-describedby="archive-help archive-error">
           <label for="project-archive" class="button button-secondary file-label">Выбрать файл</label>
-          <span id="archive-help" class="field-help">ZIP, RAR, TAR, TAR.GZ, TGZ · до 50 МиБ</span>
+          <span id="archive-help" class="field-help">ZIP · до 50 МиБ</span>
         </div>
         @if (flow.file; as file) {
           <div class="selected-file"><span class="file-name">▤ &nbsp; {{ file.name }}</span>
@@ -47,15 +53,12 @@
             <button type="button" class="icon-button" [disabled]="flow.busy()" aria-label="Убрать архив" (click)="removeFile()">×</button></div>
         }
         <p id="archive-error" class="field-error" aria-live="polite">{{ fileError }}</p>
-        @if (!features.archiveUpload) {
-          <p class="notice notice-info">Архивы пока не поддерживаются. Укажите ссылку на репозиторий.</p>
-        }
       }
 
       <div class="criteria-section">
         <div class="criteria-heading"><div><h3>Дополнительные критерии <span class="optional-label">необязательно</span></h3>
           <p class="field-help">Добавьте свои требования к проверке.</p></div>
-          <button #addCriterionButton type="button" class="button button-small button-secondary" [disabled]="flow.busy()"
+          <button #addCriterionButton type="button" class="button button-small button-secondary" [disabled]="flow.busy() || flow.criteria().length >= 20"
             (click)="openCriterion($event)"><span aria-hidden="true">+</span> Добавить</button></div>
         @for (criterion of flow.criteria(); track $index; let index = $index) {
           <div class="custom-criterion"><div><strong>{{ criterion.name }}</strong><span class="criterion-scale">{{ criterion.scale }}</span>
@@ -67,16 +70,25 @@
                 (click)="removeCriterion(index)">×</button></div></div>
         }
         @if (!flow.criteria().length) { <div class="empty-criteria">Можно оставить пустым.</div> }
-        @if (flow.criteria().length && !features.customCriteria) {
-          <p class="notice notice-info">Дополнительные критерии пока не поддерживаются. Удалите их из списка, чтобы проверить проект.</p>
-        }
       </div>
 
       @if (flow.error()) { <div class="notice notice-error" role="alert">{{ flow.error() }}</div> }
-      <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy()">
-        {{ flow.phase() === 'submitting' ? 'Отправка…' : 'Начать проверку' }} <span aria-hidden="true">→</span>
-      </button><p class="field-help">После проверки отчёт откроется автоматически.</p></div>
+      <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy() || (flow.sourceType === 'LIST' && (!listUrls.length || flow.batchBusy() || reading))">
+        {{ flow.phase() === 'submitting' ? 'Отправка…' : flow.sourceType === 'LIST' ? 'Проверить список' : 'Начать проверку' }} <span aria-hidden="true">→</span>
+      </button></div>
     </form>
+    @if (flow.batchRows().length) {
+      <section class="panel batch-results"><h2>Результаты проверки списка</h2>
+        <table><thead><tr><th>Репозиторий</th><th>Статус</th><th>Итоговый балл</th><th>Отчёт</th></tr></thead>
+        <tbody>@for (row of flow.batchRows(); track row.url) {
+          <tr><td>{{ row.url }}</td><td>{{ row.status }} @if (row.error) { <p>{{ row.error }}</p> }</td>
+          <td>{{ row.score == null ? '—' : row.score.toFixed(1) }}</td><td>
+          @if (row.status === 'Готово') { <a [routerLink]="['/checks',row.id,'report']">Открыть отчёт</a> }
+          @if (row.status === 'Нет ответа' && row.id) { <a [routerLink]="['/checks',row.id,'wait']">Уточнить статус</a> }
+          </td></tr>
+        }</tbody></table>
+      </section>
+    }
   </div>
 
   <aside class="modules-panel" aria-labelledby="modules-heading">

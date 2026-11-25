@@ -57,3 +57,7 @@ bin/
 ### Environment ###
 .env
 *.local
+
+### Logs ###
+*.log
+run.log

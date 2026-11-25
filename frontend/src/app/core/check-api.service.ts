@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { map, timeout, TimeoutError } from 'rxjs';
-import { CheckSubmission, readCheck, readReport } from './check.models';
+import { CheckSubmission, readCheck, readReport, CustomCriterion } from './check.models';
 
 @Injectable({ providedIn: 'root' })
 export class CheckApiService {
@@ -21,6 +21,18 @@ export class CheckApiService {
       value: input.url.trim().replace(/\/$/, ''),
       ...(input.customCriteria.length ? { customCriteria: input.customCriteria } : {}),
     }).pipe(timeout(30_000), map(readCheck));
+  }
+
+  createBatch(file: File, customCriteria: CustomCriterion[]) {
+    const body = new FormData();
+    body.append('file', file);
+    if (customCriteria.length) {
+      body.append('customCriteria', new Blob([JSON.stringify(customCriteria)], { type: 'application/json' }));
+    }
+    return this.http.post<unknown[]>('/api/checks/archive', body).pipe(
+      timeout(60_000), // 60 секунд на загрузку и парсинг файла
+      map(res => res.map(readCheck)) // Превращаем ответ в массив CheckResponse
+    );
   }
 
   run(id: number) {

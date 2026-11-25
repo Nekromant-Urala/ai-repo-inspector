@@ -8,6 +8,14 @@ import {
   CustomCriterion, repositoryUrlError, SourceType,
 } from './check.models';
 
+export interface BatchRow {
+  id: number;
+  url: string;
+  status: 'В очереди' | 'Проверяется' | 'Готово' | 'Ошибка';
+  score?: number;
+  error?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CheckFlowService {
   private readonly api = inject(CheckApiService);
@@ -27,30 +35,60 @@ export class CheckFlowService {
   readonly batchRows = signal<BatchRow[]>([]);
   readonly batchBusy = signal(false);
 
-  async runBatch(urls: string[]): Promise<void> {
-    if (this.batchBusy() || !urls.length) return;
+  // НОВЫЙ МЕТОД: отправляет файл (ZIP/TXT) на бэкенд и запускает опрос статусов
+  async submitBatch(file: File): Promise<void> {
+    if (this.batchBusy()) return;
     this.batchBusy.set(true);
-    const customCriteria = [...this.criteria()];
-    this.batchRows.set(urls.map(url => ({url, status: 'В очереди'})));
-    const update = (url: string, patch: Partial<BatchRow>) =>
-      this.batchRows.update(rows => rows.map(row => row.url === url ? {...row, ...patch} : row));
-    const queue = urls.values();
-    const worker = async () => {
-      for (const url of queue) {
-        try {
-          update(url, {status: 'Проверяется'});
-          const check = await firstValueFrom(this.api.create({type: 'GIT_URL', url, file: null, customCriteria}));
-          update(url, {id: check.id});
-          const report = await firstValueFrom(this.api.run(check.id));
-          update(url, {status: 'Готово', score: report.overallScore});
-        } catch (error) {
-          const uncertain = error instanceof HttpErrorResponse && [0,502,503,504].includes(error.status);
-          update(url, {status: uncertain ? 'Нет ответа' : 'Ошибка', error: checkErrorMessage(error)});
+    this.batchRows.set([]);
+    this.error.set('');
+
+    try {
+      // 1. Отправляем файл на бэкенд и получаем массив созданных задач
+      const checks = await firstValueFrom(this.api.createBatch(file, this.criteria()));
+      
+      // 2. Заполняем таблицу начальными данными (PENDING)
+      this.batchRows.set(checks.map(c => ({
+        id: c.id,
+        url: c.sourceValue,
+        status: 'В очереди'
+      })));
+
+      // 3. Запускаем опрос статусов для каждого id
+      checks.forEach(check => this.pollStatus(check.id));
+
+    } catch (error) {
+      this.error.set(checkErrorMessage(error));
+    } finally {
+      this.batchBusy.set(false);
+    }
+  }
+
+  // Вспомогательный метод для опроса статуса конкретной задачи
+  private pollStatus(id: number): void {
+    const updateRow = (patch: Partial<BatchRow>) => 
+      this.batchRows.update(rows => rows.map(r => r.id === id ? { ...r, ...patch } : r));
+
+    const interval = setInterval(async () => {
+      try {
+        const check = await firstValueFrom(this.api.status(id));
+        
+        if (check.status === 'RUNNING') {
+          updateRow({ status: 'Проверяется' });
+        } else if (check.status === 'DONE') {
+          clearInterval(interval);
+          updateRow({ status: 'Готово' });
+          // Запрашиваем отчет, чтобы взять итоговый балл
+          const report = await firstValueFrom(this.api.report(id));
+          updateRow({ score: report.overallScore });
+        } else if (check.status === 'FAILED') {
+          clearInterval(interval);
+          updateRow({ status: 'Ошибка', error: 'Анализ не удался' });
         }
+      } catch (e) {
+        clearInterval(interval);
+        updateRow({ status: 'Ошибка', error: checkErrorMessage(e) });
       }
-    };
-    try { await Promise.all(Array.from({length: Math.min(3, urls.length)}, worker)); }
-    finally { this.batchBusy.set(false); }
+    }, 2000); // Опрос каждые 2 секунды
   }
 
   async submit(input: CheckSubmission): Promise<void> {
@@ -72,7 +110,6 @@ export class CheckFlowService {
       this.reports.update(reports => ({ ...reports, [report.checkId]: report }));
       this.check.set({ ...check, status: 'DONE' });
       this.phase.set('done');
-      // The waiting page opens the report. Leaving it does not redirect the user back.
     } catch (error) {
       const uncertain = !!this.check() && error instanceof HttpErrorResponse
         && [0, 502, 503, 504].includes(error.status);
@@ -82,5 +119,3 @@ export class CheckFlowService {
     }
   }
 }
-
-interface BatchRow { url: string; status: string; id?: number; score?: number; error?: string }

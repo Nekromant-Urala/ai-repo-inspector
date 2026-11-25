@@ -4,6 +4,7 @@ import com.airepo.domain.AnalysisReport
 import com.airepo.web.dto.CheckResponse
 import com.airepo.web.dto.CreateCheckRequest
 import com.airepo.web.dto.CustomCriterion
+import com.airepo.web.service.CheckBackgroundRunner
 import com.airepo.web.service.CheckOrchestrator
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.http.HttpStatus
@@ -21,14 +22,17 @@ import org.springframework.web.server.ResponseStatusException
 /**
  * REST API сервиса.
  *
- * - `POST /api/checks`        — создать задачу проверки (вернёт id и статус PENDING)
- * - `POST /api/checks/{id}/run` — запустить анализ и получить отчёт
- * - `GET  /api/checks/{id}`   — узнать текущий статус (для страницы ожидания)
+ * - `POST /api/checks`          — создать одну задачу проверки (вернёт id и статус PENDING)
+ * - `POST /api/checks/archive`  — загрузить ZIP/TXT со списком ссылок и создать пачку задач
+ * - `POST /api/checks/{id}/run` — запустить анализ и получить отчёт (синхронно)
+ * - `GET  /api/checks/{id}`     — узнать текущий статус (для страницы ожидания)
+ * - `GET  /api/checks/{id}/report` — получить готовый отчёт
  */
 @RestController
 @RequestMapping("/api/checks")
 class CheckController(
     private val orchestrator: CheckOrchestrator,
+    private val backgroundRunner: CheckBackgroundRunner, // Добавили фоновый сервис
 ) {
 
     @PostMapping
@@ -41,7 +45,16 @@ class CheckController(
     fun archive(
         @RequestPart file: MultipartFile,
         @RequestPart(required = false) customCriteria: List<CustomCriterion>?,
-    ) = orchestrator.archive(file, customCriteria.orEmpty())
+    ): List<CheckResponse> {
+        // 1. Оркестратор парсит файл и создаёт пачку задач в БД (статус PENDING)
+        val results = orchestrator.archive(file, customCriteria.orEmpty())
+        
+        // 2. Запускаем каждую задачу в фоне через @Async
+        results.forEach { backgroundRunner.runAsync(it.id) }
+        
+        // 3. Мгновенно возвращаем фронту список созданных задач
+        return results
+    }
 
     @GetMapping("/{id}/report")
     fun report(@PathVariable id: Long): JsonNode = orchestrator.report(id)

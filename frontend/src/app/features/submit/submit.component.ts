@@ -42,36 +42,29 @@ export class SubmitComponent {
     return this.editingIndex === null ? null : this.flow.criteria()[this.editingIndex] ?? null;
   }
 
-  listUrls: string[] = [];
+  // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ СПИСКА
+  selectedListFile: File | null = null;
   listMessage = '';
-  reading = false;
 
-  async readList(event: Event): Promise<void> {
+  // НОВЫЙ МЕТОД: просто сохраняем файл (без чтения в браузере)
+  readList(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
-    this.listUrls = [];
+    this.selectedListFile = null;
     this.listMessage = '';
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.txt') || file.size > 1024 * 1024) {
-      this.listMessage = 'Выберите TXT до 1 МиБ.'; return;
+
+    if (file.size > 50 * 1024 * 1024) {
+      this.listMessage = 'Файл слишком большой (макс. 50 МБ).';
+      return;
     }
-    this.reading = true;
-    try {
-      const urls = new Set<string>();
-      const invalid: number[] = [];
-      const lines = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer()).split(/\r?\n/);
-      lines.forEach((line, i) => {
-        const url = line.trim();
-        if (!url) return;
-        if (repositoryUrlError(url)) { invalid.push(i + 1); return; }
-        const normalized = new URL(url);
-        normalized.hostname = normalized.hostname.replace(/^www\./, '');
-        urls.add(normalized.href.replace(/\/$/, '').replace(/\.git$/, ''));
-      });
-      this.listUrls = urls.size <= 20 ? [...urls] : [];
-      this.listMessage = urls.size > 20 ? 'Максимум 20 репозиториев.' : 'Подходящих ссылок: ' + urls.size;
-      if (invalid.length) this.listMessage += '. Ошибки в строках: ' + invalid.slice(0, 20).join(', ');
-    } catch { this.listMessage = 'Не удалось прочитать файл в UTF-8.'; }
-    finally { this.reading = false; }
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.txt') && !name.endsWith('.zip')) {
+      this.listMessage = 'Выберите файл TXT или ZIP.';
+      return;
+    }
+
+    this.selectedListFile = file;
+    this.listMessage = `Выбран файл: ${file.name}`;
   }
 
   setSource(type: SourceType | 'LIST'): void {
@@ -134,9 +127,21 @@ export class SubmitComponent {
     this.addCriterionButton?.nativeElement.focus();
   }
 
+  // ОБНОВЛЕННЫЙ МЕТОД submit
   submit(): void {
     if (this.flow.busy()) return;
-    if (this.flow.sourceType === 'LIST') { void this.flow.runBatch(this.listUrls); return; }
+    
+    // Для списка ссылок вызываем новый метод
+    if (this.flow.sourceType === 'LIST') {
+      if (!this.selectedListFile) {
+        this.listMessage = 'Выберите файл со списком ссылок.';
+        return;
+      }
+      void this.flow.submitBatch(this.selectedListFile); 
+      return; 
+    }
+
+    // Для одиночных проверок оставляем старую логику
     this.submitted = true;
     this.url.markAsTouched();
     this.flow.url = this.url.value;

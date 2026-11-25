@@ -33,8 +33,8 @@
         <p id="url-error" class="field-error" aria-live="polite">{{ urlError }}</p>
       } @else if (flow.sourceType === 'LIST') {
         <label for="repo-list">Список репозиториев</label>
-        <input id="repo-list" type="file" accept=".txt" [disabled]="reading || flow.batchBusy()" (change)="readList($event)">
-        <p class="field-help">TXT в UTF-8, одна ссылка на строку, до 20 репозиториев.</p>
+        <input id="repo-list" type="file" accept=".txt,.zip" [disabled]="flow.batchBusy()" (change)="readList($event)">
+        <p class="field-help">TXT (UTF-8, одна ссылка на строку) или ZIP с TXT внутри. До 20 репозиториев.</p>
         <p role="status">{{ listMessage }}</p>
       } @else {
         <label for="project-archive">Архив с исходным кодом</label>
@@ -73,18 +73,17 @@
       </div>
 
       @if (flow.error()) { <div class="notice notice-error" role="alert">{{ flow.error() }}</div> }
-      <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy() || (flow.sourceType === 'LIST' && (!listUrls.length || flow.batchBusy() || reading))">
+      <div class="submit-actions"><button class="button button-primary submit-button" type="submit" [disabled]="flow.busy() || (flow.sourceType === 'LIST' && (!selectedListFile || flow.batchBusy()))">
         {{ flow.phase() === 'submitting' ? 'Отправка…' : flow.sourceType === 'LIST' ? 'Проверить список' : 'Начать проверку' }} <span aria-hidden="true">→</span>
       </button></div>
     </form>
     @if (flow.batchRows().length) {
       <section class="panel batch-results"><h2>Результаты проверки списка</h2>
         <table><thead><tr><th>Репозиторий</th><th>Статус</th><th>Итоговый балл</th><th>Отчёт</th></tr></thead>
-        <tbody>@for (row of flow.batchRows(); track row.url) {
+        <tbody>@for (row of flow.batchRows(); track row.id) {
           <tr><td>{{ row.url }}</td><td>{{ row.status }} @if (row.error) { <p>{{ row.error }}</p> }</td>
           <td>{{ row.score == null ? '—' : row.score.toFixed(1) }}</td><td>
           @if (row.status === 'Готово') { <a [routerLink]="['/checks',row.id,'report']">Открыть отчёт</a> }
-          @if (row.status === 'Нет ответа' && row.id) { <a [routerLink]="['/checks',row.id,'wait']">Уточнить статус</a> }
           </td></tr>
         }</tbody></table>
       </section>

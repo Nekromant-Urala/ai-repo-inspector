@@ -14,9 +14,12 @@ import com.airepo.web.dto.CreateCheckRequest
 import com.airepo.web.dto.CustomCriterion
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipInputStream
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
@@ -34,17 +37,21 @@ class CheckOrchestrator(
     private val reportService: ReportService,
 ) {
 
-    /** Создаёт задачу в статусе PENDING. */
+    /** Создаёт одну задачу в статусе PENDING. */
     fun create(req: CreateCheckRequest): CheckResponse {
+        if (!isValidUrl(req.value)) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Недопустимая ссылка")
         val source = RepositorySource(type = req.type, value = req.value)
-        val uri = runCatching { URI(req.value) }.getOrNull()
-        if (req.type != SourceType.GIT_URL || uri == null || uri.scheme != "https" ||
-            uri.host?.lowercase()?.removePrefix("www.") !in setOf("github.com", "gitlab.com") ||
-            uri.rawUserInfo != null || uri.port != -1 || uri.query != null || uri.fragment != null ||
-            !Regex("/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+/?").matches(uri.rawPath) ||
-            uri.rawPath.split('/').any { it == "." || it == ".." })
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Недопустимая ссылка")
         return checkService.create(source, criteriaJson(req.customCriteria)).toResponse()
+    }
+
+    /** Проверка валидности URL (вынесена отдельно, чтобы использовать и в списке). */
+    private fun isValidUrl(url: String): Boolean {
+        val uri = runCatching { URI(url) }.getOrNull() ?: return false
+        return uri.scheme == "https" &&
+                uri.host?.lowercase()?.removePrefix("www.") in setOf("github.com", "gitlab.com") &&
+                uri.rawUserInfo == null && uri.port == -1 && uri.query == null && uri.fragment == null &&
+                uri.rawPath?.let { Regex("/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+/?").matches(it) } == true &&
+                uri.rawPath.split('/').none { it == "." || it == ".." }
     }
 
     private fun criteriaJson(criteria: List<CustomCriterion>): String {
@@ -55,13 +62,64 @@ class CheckOrchestrator(
         return json.writeValueAsString(criteria)
     }
 
-    fun archive(file: MultipartFile, criteria: List<CustomCriterion>): CheckResponse {
-        val name = file.originalFilename.orEmpty().substringAfterLast('/').substringAfterLast('\\').takeLast(250)
+    /**
+     * Принимает файл (ZIP с txt внутри или просто TXT), извлекает список ссылок
+     * и создаёт пачку задач проверки. Возвращает список созданных задач.
+     */
+    fun archive(file: MultipartFile, criteria: List<CustomCriterion>): List<CheckResponse> {
+        val name = file.originalFilename.orEmpty().lowercase()
+        
         if (file.size > 50L * 1024 * 1024) throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE)
         val bytes = file.bytes
-        if (!name.endsWith(".zip", true) || !bytes.take(4).toByteArray().contentEquals(byteArrayOf(80, 75, 3, 4)))
-            throw ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-        return checkService.create(RepositorySource(SourceType.ARCHIVE, name), criteriaJson(criteria), bytes).toResponse()
+
+        // 1. Извлекаем ссылки в зависимости от типа файла
+        val urls = when {
+            name.endsWith(".zip") -> {
+                // Проверяем магические байты ZIP
+                if (!bytes.take(4).toByteArray().contentEquals(byteArrayOf(80, 75, 3, 4))) {
+                    throw ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Файл поврежден или не является ZIP")
+                }
+                extractUrlsFromZip(bytes)
+            }
+            name.endsWith(".txt") -> parseTxt(bytes)
+            else -> throw ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Поддерживаются только ZIP или TXT")
+        }
+
+        // 2. Валидация списка
+        if (urls.isEmpty()) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "В файле не найдено ссылок")
+        if (urls.size > 20) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Максимум 20 репозиториев в списке")
+
+        // 3. Создаём задачи
+        val criteriaJson = criteriaJson(criteria)
+        return urls.map { url ->
+            if (!isValidUrl(url)) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Недопустимая ссылка в списке: $url")
+            }
+            val source = RepositorySource(type = SourceType.GIT_URL, value = url)
+            checkService.create(source, criteriaJson, null).toResponse()
+        }
+    }
+
+    private fun parseTxt(bytes: ByteArray): List<String> {
+        return bytes.toString(Charsets.UTF_8)
+            .lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") } // игнорируем пустые строки и комментарии
+            .distinct() // убираем дубликаты
+    }
+
+    private fun extractUrlsFromZip(bytes: ByteArray): List<String> {
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory && entry.name.lowercase().endsWith(".txt")) {
+                    // Читаем первый найденный txt и возвращаем результат
+                    return parseTxt(zip.readAllBytes())
+                }
+                entry = zip.nextEntry
+            }
+        }
+        return emptyList()
     }
 
     fun report(id: Long): JsonNode {
@@ -69,26 +127,13 @@ class CheckOrchestrator(
         return json.readTree(check.reportJson ?: throw ResponseStatusException(HttpStatus.CONFLICT))
     }
 
-    private fun fileScore(root: Path, description: String): Int? {
-        if (!description.startsWith("Файл:")) return null
-        val name = description.removePrefix("Файл:").trim()
-        if (name.isEmpty()) return null
-        val relative = runCatching { Path.of(name) }.getOrNull() ?: return null
-        if (relative.isAbsolute || relative.any { it.toString() == ".." }) return null
-        val path = root.resolve(relative)
-        if (!Files.isRegularFile(path)) return 0
-        return if (path.toRealPath().startsWith(root.toRealPath())) 100 else 0
-    }
-
     /** Возвращает текущий статус задачи. */
     fun status(id: Long): CheckResponse? =
         checkService.findById(id)?.toResponse()
 
     /**
-     * Запускает анализ и возвращает готовый отчёт.
-     *
-     * TODO: вынести в фоновую задачу (например, @Async / корутины), чтобы фронт
-     * мог показывать страницу ожидания, опрашивая GET /api/checks/{id} до DONE.
+     * Запускает анализ синхронно и возвращает готовый отчёт.
+     * (Этот метод остаётся для обратной совместимости одиночных проверок).
      */
     fun run(id: Long): AnalysisReport {
         val entity = checkService.findById(id)
@@ -113,6 +158,18 @@ class CheckOrchestrator(
             checkService.updateStatus(id, CheckStatus.FAILED)
             throw e
         }
+    }
+
+    /** Вспомогательный метод для кастомных критериев (нужен и в run, и в фоне). */
+    private fun fileScore(root: Path, description: String): Int? {
+        if (!description.startsWith("Файл:")) return null
+        val name = description.removePrefix("Файл:").trim()
+        if (name.isEmpty()) return null
+        val relative = runCatching { Path.of(name) }.getOrNull() ?: return null
+        if (relative.isAbsolute || relative.any { it.toString() == ".." }) return null
+        val path = root.resolve(relative)
+        if (!Files.isRegularFile(path)) return 0
+        return if (path.toRealPath().startsWith(root.toRealPath())) 100 else 0
     }
 }
 

@@ -56,9 +56,15 @@ class GitHistoryAnalyzer : CriterionAnalyzer {
     )
 
     override fun analyze(context: AnalysisContext): CriterionResult {
+        // <--- ДОБАВЛЕНО: Отладочный вывод о начале работы
+        println("========== ВНИМАНИЕ: GIT ANALYZER ЗАПУЩЕН! ==========")
+        
         val gitDirectory = context.rootDir.resolve(".git")
+        // <--- ДОБАВЛЕНО: Смотрим, где именно мы ищем папку .git
+        println("========== GIT ANALYZER: Ищу .git по пути: $gitDirectory ==========")
 
         if (!Files.exists(gitDirectory)) {
+            println("========== GIT ANALYZER: ПАПКА .git НЕ НАЙДЕНА! ==========") // <--- ДОБАВЛЕНО
             return CriterionResult(
                 criterionId = id,
                 criterionName = name,
@@ -80,7 +86,11 @@ class GitHistoryAnalyzer : CriterionAnalyzer {
                     .call()
                     .toList()
 
+                // <--- ДОБАВЛЕНО: Покажет, сколько коммитов реально увидел JGit
+                println("========== GIT ANALYZER: НАЙДЕНО КОММИТОВ = ${commits.size} ==========")
+
                 if (commits.isEmpty()) {
+                    println("========== GIT ANALYZER: КОММИТОВ 0! ==========") // <--- ДОБАВЛЕНО
                     return CriterionResult(
                         criterionId = id,
                         criterionName = name,
@@ -212,6 +222,9 @@ class GitHistoryAnalyzer : CriterionAnalyzer {
                     "Без стандартного префикса: ${withoutPrefix.size}. " +
                     "Оценка: ${String.format(Locale.US, "%.1f", score)}/100."
 
+                // <--- ДОБАВЛЕНО: Смотрим на итоговую строку summary и оценку
+                println("========== GIT ANALYZER: РЕЗУЛЬТАТ: $summary ==========")
+
                 CriterionResult(
                     criterionId = id,
                     criterionName = name,
@@ -221,6 +234,10 @@ class GitHistoryAnalyzer : CriterionAnalyzer {
                 )
             }
         } catch (e: Exception) {
+            // <--- ДОБАВЛЕНО: Если что-то падает, мы это увидим в консоли
+            println("========== ОШИБКА GIT ANALYZER: ${e.message} ==========")
+            e.printStackTrace() 
+            
             CriterionResult(
                 criterionId = id,
                 criterionName = name,

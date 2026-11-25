@@ -35,14 +35,14 @@ class ProjectLoader(
 
     /**
      * Клонирует репозиторий по [source.value] (URL GitHub/GitLab).
-     * Используем `--depth 1` — для аудита не нужна полная история.
+     * Используем нет `--depth 1` — для аудита не нужна полная история.
      */
     private fun cloneGit(source: RepositorySource, target: Path): LoadedProject {
         val repoName = source.value.substringAfterLast('/').removeSuffix(".git").ifBlank { "repo" }
         val dest = target.resolve(repoName)
         Files.createDirectories(dest)
 
-        val process = ProcessBuilder("git", "clone", "--depth", "1", source.value, dest.absolutePathString())
+        val process = ProcessBuilder("git", "clone", source.value, dest.absolutePathString())
             .redirectErrorStream(true)
             .start()
 

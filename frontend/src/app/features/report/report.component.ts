@@ -17,6 +17,8 @@ export class ReportComponent {
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   readonly id = computed(() => parseCheckId(this.params()?.get('id') ?? null));
   readonly report = computed(() => this.flow.reports()[this.id() ?? 0] ?? null);
+  readonly recommendations = computed(() => this.report()?.recommendations ?? []);
+  readonly customAssessments = computed(() => this.report()?.customAssessments ?? []);
   readonly filter = signal<Severity | 'ALL'>('ALL');
   readonly filters: { key: Severity | 'ALL'; label: string }[] = [
     { key: 'ALL', label: 'Все замечания' }, { key: 'ERROR', label: 'Ошибки' },

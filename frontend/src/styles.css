@@ -186,6 +186,17 @@ h3 { font-size: 16px; font-weight: 650; line-height: 1.4; }
 .finding-location code { font: inherit; font-family: ui-monospace, Consolas, monospace; }
 .no-findings { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--line); font-size: 11px; color: #7d8b79; }
 .no-findings > span { margin-right: 6px; color: var(--accent); }
+.report-recommendations { padding: 24px 28px 28px; }
+.report-recommendations .results-heading { margin: 0 0 16px; }
+.report-custom { padding: 24px 28px 28px; }
+.report-custom .results-heading { margin: 0 0 18px; }
+.custom-list { display: flex; flex-direction: column; gap: 18px; }
+.custom-item { border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; }
+.custom-name { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: #22312a; }
+.custom-description { margin: 0; font-size: 12.5px; line-height: 1.55; color: #33413a; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recommendation-list { margin: 0; padding-left: 22px; }
+.recommendation-list li { margin: 9px 0; font-size: 12.5px; color: #33413a; overflow-wrap: anywhere; }
+.recommendation-list li::marker { color: var(--accent); font-weight: 700; }
 .empty-results { padding: 30px; grid-column: 1 / -1; }
 .empty-results .muted { margin-top: 10px; }
 .skip-link { position: fixed; left: 15px; top: -100px; z-index: 20; background: #fff; padding: 10px; border: 1px solid var(--accent); }

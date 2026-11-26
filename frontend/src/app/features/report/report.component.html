@@ -13,6 +13,31 @@
         aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="result.overallScore"></span></div>
     </div>
   </section>
+  @if (customAssessments().length) {
+    <section class="panel report-custom" aria-labelledby="custom-heading">
+      <div class="results-heading"><div><p class="eyebrow">ИИ-АГЕНТ</p>
+        <h2 id="custom-heading">Кастомные критерии</h2></div>
+        <span class="field-help">Оценки пользовательских критериев по описанию</span></div>
+      <div class="custom-list">
+        @for (assessment of customAssessments(); track assessment.name) {
+          <div class="custom-item">
+            <h3 class="custom-name">{{ assessment.name }}</h3>
+            <p class="custom-description">{{ assessment.description }}</p>
+          </div>
+        }
+      </div>
+    </section>
+  }
+  @if (recommendations().length) {
+    <section class="panel report-recommendations" aria-labelledby="recommendations-heading">
+      <div class="results-heading"><div><p class="eyebrow">ИИ-АГЕНТ</p>
+        <h2 id="recommendations-heading">Что исправить</h2></div>
+        <span class="field-help">Рекомендации по результатам проверки</span></div>
+      <ol class="recommendation-list">
+        @for (item of recommendations(); track $index) { <li>{{ item }}</li> }
+      </ol>
+    </section>
+  }
   <div class="results-heading"><div><p class="eyebrow">ПОДРОБНОСТИ</p><h2>Результаты по критериям</h2></div><span class="field-help">Оценки: от 0 до 100</span></div>
   @if (totals().ALL) {
     <div class="findings-filter" role="group" aria-label="Тип замечаний">@for (item of filters; track item.key) {

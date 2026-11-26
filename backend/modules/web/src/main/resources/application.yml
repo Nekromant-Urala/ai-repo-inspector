@@ -21,3 +21,21 @@ logging:
   level:
     root: INFO
     com.airepo: DEBUG
+
+airepo:
+  tests:
+    # Критерий «Покрытие тестами»: статический анализ + изолированный запуск тестов.
+    # AUTO — Docker, если доступен; STATIC_ONLY — без запуска тестов.
+    enabled: ${AIREPO_TESTS_ENABLED:true}
+    mode: ${AIREPO_TESTS_MODE:AUTO}
+    allow-local-execution: ${AIREPO_TESTS_ALLOW_LOCAL:false}
+    timeout: ${AIREPO_TESTS_TIMEOUT:10m}
+    target-coverage: ${AIREPO_TESTS_TARGET_COVERAGE:80}
+    warning-coverage: ${AIREPO_TESTS_WARNING_COVERAGE:50}
+    sandbox:
+      # none — полностью герметичный прогон (зависимости должны быть в образе/проекте).
+      network: ${AIREPO_TESTS_NETWORK:bridge}
+      memory: ${AIREPO_TESTS_MEMORY:2g}
+      cpus: ${AIREPO_TESTS_CPUS:2.0}
+      tmpfs-size: ${AIREPO_TESTS_TMPFS_SIZE:2g}
+      pids-limit: ${AIREPO_TESTS_PIDS_LIMIT:512}

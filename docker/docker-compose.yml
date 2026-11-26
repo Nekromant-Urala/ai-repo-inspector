@@ -26,8 +26,20 @@ services:
       DB_URL: jdbc:postgresql://db:5432/airepo
       DB_USER: airepo
       DB_PASSWORD: airepo
+      # Изолированный запуск тестов аудируемого проекта (модуль analyzer-tests).
+      # network=none отключает сеть внутри контейнера, но тогда не скачаются
+      # зависимости; по умолчанию bridge.
+      AIREPO_TESTS_MODE: AUTO
+      AIREPO_TESTS_NETWORK: bridge
+      AIREPO_TESTS_MEMORY: 2g
+      AIREPO_TESTS_CPUS: "2.0"
     ports:
       - "8080:8080"
+    volumes:
+      # Docker-out-of-Docker: бэкенд использует демон хоста, чтобы поднимать
+      # одноразовые контейнеры с тестами. Без сокета критерий «Покрытие
+      # тестами» работает только статически.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy

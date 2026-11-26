@@ -36,7 +36,7 @@ ai-repo/
 │       ├── analyzer-api/       # контракт критерия (CriterionAnalyzer)
 │       ├── analyzer-readme/    # критерий «README»
 │       ├── analyzer-code/      # критерий «Качество кода» (линтер/форматтер)
-│       ├── analyzer-tests/     # критерий «Покрытие тестами»
+│       ├── analyzer-tests/     # критерий «Покрытие тестами» (стек-детект + Docker-раннер)
 │       ├── analyzer-structure/ # критерий «Структура проекта»
 │       ├── analyzer-git/       # критерий «История коммитов и вклад участников»
 │       ├── analyzer-security/  # критерий «Безопасность» (поиск секретов)
@@ -83,7 +83,7 @@ ai-repo/
 |--------|----------|---------------|
 | `analyzer-readme` | README | Наличие README и ключевых разделов (установка, сборка, запуск) |
 | `analyzer-code` | Качество кода | Конфиг линтера/форматтера, маркеры TODO/FIXME |
-| `analyzer-tests` | Покрытие тестами | Наличие тестовой директории и тестовых файлов |
+| `analyzer-tests` | Покрытие тестами | Тестовая директория/файлы + изолированный запуск тестов в Docker с флагами сбора покрытия |
 | `analyzer-structure` | Структура проекта | Осмысленность архитектуры файлов, «плоскость» |
 | `analyzer-git` | История коммитов и вклад участников | Оценка git-истории и процентного вклада участников |
 | `analyzer-security` | Безопасность | Поиск секретов/ключей/токенов, оставленных в коде |
@@ -100,6 +100,93 @@ ai-repo/
 3. В `build.gradle.kts` модуля добавьте зависимости на `analyzer-api`, `domain`, `common`, `spring-context`.
 4. Реализуйте интерфейс `CriterionAnalyzer`, пометьте класс `@Component`.
 5. Подключите модуль в `backend/modules/web/build.gradle.kts` (чтобы бин попал в classpath приложения).
+
+---
+
+## Модуль «Покрытие тестами» (analyzer-tests)
+
+Критерий работает в два слоя:
+
+1. **Статический анализ** — ищет тестовые каталоги/файлы и настроенные
+   инструменты покрытия. Работает всегда, даже без Docker.
+2. **Изолированный запуск** — по маркерам определяет технологический стек,
+   поднимает одноразовый контейнер, выполняет тесты с флагами сбора покрытия
+   и забирает отчёт. Оценка считается от фактического процента покрытия
+   (цель — 80 %, минимум — 50 %, оба порога настраиваются).
+
+### Поддерживаемые стеки
+
+| Стек | Docker-образ | Сбор покрытия |
+|------|--------------|---------------|
+| Gradle (Kotlin/Java) | `eclipse-temurin:21-jdk` (с wrapper) / `gradle:8.10-jdk21` | `test` + init-скрипт JaCoCo, XML-отчёт |
+| Maven | `maven:3.9-eclipse-temurin-21` | `jacoco:prepare-agent test jacoco:report` |
+| Node.js (Jest / Vitest / Mocha+nyc) | `node:20-alpine` | `--coverage`, LCOV + Istanbul JSON |
+| Python | `python:3.12-slim` | `pytest --cov`, `coverage.xml` + `lcov.info` |
+| Go | `golang:1.23-alpine` | `go test -coverprofile=coverage.out` |
+| .NET | `mcr.microsoft.com/dotnet/sdk:8.0` | `dotnet test --collect:"XPlat Code Coverage"` (Cobertura) |
+| PHP | `composer:2` | `phpunit --coverage-clover` (если заявлен xdebug/pcov) |
+| Ruby | `ruby:3.3` | `bundle exec rspec` + SimpleCov |
+| Rust | `rust:1.83-slim` | `cargo test` (покрытие пока не собирается) |
+
+Стеки ищутся по файлам-маркерам (`build.gradle.kts`, `pom.xml`, `package.json`,
+`go.mod`, `Cargo.toml`, ...). Поддерживаются вложенные проекты монорепозитория
+(глубина до 3 уровней) и несколько стеков в одном проекте.
+
+### Изоляция среды выполнения
+
+- копия проекта уезжает во временный именованный Docker volume — хостовая ФС
+  и процесс бэкенда недоступны;
+- `--read-only` rootfs, `--cap-drop ALL`, `no-new-privileges`, `--init`;
+- лимиты `--cpus`, `--memory`, `--pids-limit`, отдельный tmpfs для `/tmp`;
+- жёсткий таймаут на установку зависимостей и прогон тестов;
+- по завершении контейнер, volume и временные каталоги удаляются в `finally`;
+- сеть по умолчанию `bridge` (нужна пакетным менеджерам); для полностью
+  герметичного прогона установите `network: none`.
+
+### Конфигурация
+
+```yaml
+airepo:
+  tests:
+    enabled: true                  # false — только статический анализ
+    mode: AUTO                     # AUTO | DOCKER | LOCAL | STATIC_ONLY
+    allow-local-execution: false   # запуск на хосте (небезопасно, по умолчанию выключен)
+    timeout: 10m
+    target-coverage: 80            # 100 баллов при достижении
+    warning-coverage: 50           # ниже — ERROR в отчёте
+    max-detection-depth: 3
+    max-plans: 8
+    sandbox:
+      network: bridge
+      cpus: "2.0"
+      memory: 2g
+      tmpfs-size: 2g
+      pids-limit: 512
+      read-only-root-filesystem: true
+      drop-all-capabilities: true
+      no-new-privileges: true
+      max-output-chars: 20000
+      max-workspace-bytes: 536870912   # 512 МБ
+    images:                        # переопределение образов по id стека
+      node: node:22-alpine
+```
+
+Те же значения доступны через переменные окружения
+(`AIREPO_TESTS_MODE`, `AIREPO_TESTS_NETWORK`, `AIREPO_TESTS_MEMORY`, ...);
+они перечислены в `backend/modules/web/src/main/resources/application.yml`.
+
+### Требования для реального запуска
+
+Бэкенду нужен доступ к Docker-демону:
+
+- **локально** — Docker CLI в `PATH` и запущенный демон;
+- **docker-compose** — проброшенный `/var/run/docker.sock` (уже добавлен
+  в `docker/docker-compose.yml`) и Docker CLI в образе бэкенда
+  (`docker/backend/Dockerfile`).
+
+Если Docker недоступен, критерий автоматически деградирует до статического
+анализа и объясняет причину в отчёте. Локальный запуск на хосте выключен по
+умолчанию: тесты чужого репозитория — это исполнение произвольного кода.
 
 ---
 
@@ -183,6 +270,13 @@ cd backend
 ./gradlew test
 ```
 
+Только тесты модуля покрытия (детект стеков, парсеры отчётов, флаги изоляции):
+
+```bash
+cd backend
+./gradlew :modules:analyzer-tests:test
+```
+
 Интеграционные тесты с контейнерами (требуют запущенный Docker). Они помечены тэгом `container`
 и по умолчанию пропускаются:
 
@@ -227,6 +321,21 @@ class MyRepositoryTest : AbstractPostgresContainerTest() {
 }
 ```
 
+Результат критерия `tests` содержит фактическое покрытие и пояснения:
+
+```json
+{
+  "criterionId": "tests",
+  "criterionName": "Покрытие тестами",
+  "score": 95.5,
+  "summary": "Тестовая директория: есть; тестовых файлов: 42; стеки: Gradle (JVM) (корень); покрытие 76.4% (1200/1570); раннер: docker.",
+  "findings": [
+    { "message": "Покрытие (Gradle (JVM) (корень)): 76.4% (1200/1570).", "severity": "INFO" },
+    { "message": "Покрытие 76.4% ниже целевого уровня 80.0%.", "severity": "WARNING" }
+  ]
+}
+```
+
 ---
 
 ## Планы / TODO
@@ -234,4 +343,7 @@ class MyRepositoryTest : AbstractPostgresContainerTest() {
 - [ ] ИИ-агент: отправить результаты проверки в LLM и сформировать «todo исправлений» (ноябрь).
 - [ ] Кастомные критерии, задаваемые через форму на фронте.
 - [ ] Запуск анализа в фоне (страница ожидания с опросом статуса).
-- [ ] Углубить критерии (реальный запуск линтеров, вычисление покрытия, полный git-анализ).
+- [x] Углубить критерий покрытия: определение стека, изолированный запуск тестов
+      в Docker и вычисление фактического покрытия.
+- [ ] Добавить сбор покрытия для Rust (`cargo-llvm-cov`) и кеширование зависимостей
+      между прогонами, чтобы ускорить повторные проверки.

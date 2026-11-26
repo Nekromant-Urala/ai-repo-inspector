@@ -8,6 +8,12 @@ export interface CustomCriterion {
   description: string;
 }
 
+/** Оценка пользовательского критерия, выданная ИИ-агентом (только описание). */
+export interface CustomCriterionAssessment {
+  name: string;
+  description: string;
+}
+
 export interface RepositorySource {
   type: SourceType;
   value: string;
@@ -40,6 +46,9 @@ export interface AnalysisReport {
   source: RepositorySource;
   overallScore: number;
   criteria: CriterionResult[];
+  customCriteria?: CustomCriterion[];
+  customAssessments?: CustomCriterionAssessment[];
+  recommendations?: string[];
 }
 
 export interface CheckSubmission {
@@ -52,7 +61,7 @@ export interface CheckSubmission {
 // Enable only after the corresponding backend contracts are implemented.
 export const CHECK_FEATURES = {
   archiveUpload: false,
-  customCriteria: false,
+  customCriteria: true,
   maxArchiveBytes: 50 * 1024 * 1024,
   archiveExtensions: ['.zip', '.rar', '.tar', '.tar.gz', '.tgz'],
 } as const;
@@ -121,6 +130,19 @@ function validCriterion(value: unknown): value is CriterionResult {
     && value['findings'].every(validFinding);
 }
 
+function validStrings(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === 'string');
+}
+
+function validCustomCriterion(value: unknown): value is CustomCriterion {
+  return record(value) && typeof value['name'] === 'string'
+    && typeof value['scale'] === 'string' && typeof value['description'] === 'string';
+}
+
+function validCustomCriterionAssessment(value: unknown): value is CustomCriterionAssessment {
+  return record(value) && typeof value['name'] === 'string' && typeof value['description'] === 'string';
+}
+
 export function readCheck(value: unknown): CheckResponse {
   if (!record(value) || !Number.isSafeInteger(value['id']) || Number(value['id']) < 1
     || !['PENDING', 'RUNNING', 'DONE', 'FAILED'].includes(String(value['status']))
@@ -133,7 +155,12 @@ export function readCheck(value: unknown): CheckResponse {
 export function readReport(value: unknown): AnalysisReport {
   if (!record(value) || !Number.isSafeInteger(value['checkId']) || Number(value['checkId']) < 1
     || !validSource(value['source']) || !validScore(value['overallScore'])
-    || !Array.isArray(value['criteria']) || !value['criteria'].every(validCriterion)) {
+    || !Array.isArray(value['criteria']) || !value['criteria'].every(validCriterion)
+    || (value['customCriteria'] != null && !(Array.isArray(value['customCriteria'])
+      && value['customCriteria'].every(validCustomCriterion)))
+    || (value['customAssessments'] != null && !(Array.isArray(value['customAssessments'])
+      && value['customAssessments'].every(validCustomCriterionAssessment)))
+    || (value['recommendations'] != null && !validStrings(value['recommendations']))) {
     throw new Error('Не удалось открыть отчёт. Начните новую проверку.');
   }
   return value as unknown as AnalysisReport;

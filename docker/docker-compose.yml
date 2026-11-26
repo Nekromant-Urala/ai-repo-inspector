@@ -26,11 +26,29 @@ services:
       DB_URL: jdbc:postgresql://db:5432/airepo
       DB_USER: airepo
       DB_PASSWORD: airepo
+      # ИИ-агент (LLM). Поднимается сервис `ollama` ниже (модель скачивается сама).
+      AGENT_ENABLED: ${AGENT_ENABLED:-true}
+      AGENT_BASE_URL: ${AGENT_BASE_URL:-http://ollama:11434}
+      AGENT_MODEL: ${AGENT_MODEL:-llama3}
+      AGENT_API_KEY: ${AGENT_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      ollama:
+        condition: service_started
+
+  # Локальная LLM (Ollama). При старте скачивает модель `llama3` (один раз),
+  # затем держит сервер. Чтобы поменять модель — задайте AGENT_MODEL и укажите её здесь.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: airepo-ollama
+    command: sh -c "ollama serve & sleep 5 && ollama pull llama3 && wait"
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
 
   frontend:
     build:
@@ -44,3 +62,4 @@ services:
 
 volumes:
   pgdata:
+  ollama:

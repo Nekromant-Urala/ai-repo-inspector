@@ -25,6 +25,7 @@ include(
     "modules:analyzer-structure",
     "modules:analyzer-git",
     "modules:analyzer-security",
+    "modules:analyzer-agent",
     "modules:report",
     "modules:web",
 )

@@ -2,6 +2,7 @@ package com.airepo.web.service
 
 import com.airepo.domain.AnalysisReport
 import com.airepo.domain.CheckStatus
+import com.airepo.domain.CustomCriterion
 import com.airepo.domain.RepositorySource
 import com.airepo.ingestion.ProjectLoader
 import com.airepo.report.ReportService
@@ -9,6 +10,7 @@ import com.airepo.storage.entity.ProjectCheckEntity
 import com.airepo.storage.service.ProjectCheckService
 import com.airepo.web.dto.CheckResponse
 import com.airepo.web.dto.CreateCheckRequest
+import com.airepo.web.dto.CustomCriterionDto
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -24,10 +26,11 @@ class CheckOrchestrator(
     private val reportService: ReportService,
 ) {
 
-    /** Создаёт задачу в статусе PENDING. */
+    /** Создаёт задачу в статусе PENDING вместе с пользовательскими критериями. */
     fun create(req: CreateCheckRequest): CheckResponse {
         val source = RepositorySource(type = req.type, value = req.value)
-        return checkService.create(source).toResponse()
+        val customCriteria = req.customCriteria.map { it.toDomain() }
+        return checkService.create(source, customCriteria).toResponse()
     }
 
     /** Возвращает текущий статус задачи. */
@@ -47,8 +50,9 @@ class CheckOrchestrator(
         checkService.updateStatus(id, CheckStatus.RUNNING)
         try {
             val source = RepositorySource(type = entity.sourceType, value = entity.sourceValue)
+            val customCriteria = checkService.findCustomCriteria(id)
             val loaded = loader.load(source)
-            val report = reportService.analyze(loaded, checkId = id)
+            val report = reportService.analyze(loaded, checkId = id, customCriteria = customCriteria)
             checkService.updateStatus(id, CheckStatus.DONE)
             return report
         } catch (e: Exception) {
@@ -57,6 +61,12 @@ class CheckOrchestrator(
         }
     }
 }
+
+private fun CustomCriterionDto.toDomain() = CustomCriterion(
+    name = name,
+    scale = scale,
+    description = description,
+)
 
 private fun ProjectCheckEntity.toResponse() = CheckResponse(
     id = id,

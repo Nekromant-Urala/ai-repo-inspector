@@ -21,3 +21,10 @@ logging:
   level:
     root: INFO
     com.airepo: DEBUG
+
+agent:
+  enabled: ${AGENT_ENABLED:false}
+  base-url: ${AGENT_BASE_URL:http://localhost:11434}
+  model: ${AGENT_MODEL:qwen3:8b}
+  api-key: ${AGENT_API_KEY:}
+  timeout: ${AGENT_TIMEOUT:120s}

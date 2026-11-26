@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":modules:analyzer-structure"))
     implementation(project(":modules:analyzer-git"))
     implementation(project(":modules:analyzer-security"))
+    implementation(project(":modules:analyzer-agent"))
 
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 

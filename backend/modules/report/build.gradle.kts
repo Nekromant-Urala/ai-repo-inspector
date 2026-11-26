@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":modules:analyzer-api"))
+    implementation(project(":modules:analyzer-agent"))
     implementation(project(":modules:domain"))
     implementation(project(":modules:ingestion"))
     implementation("org.springframework:spring-context")
